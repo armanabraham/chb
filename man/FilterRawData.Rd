@@ -2,16 +2,18 @@
 % Please edit documentation in R/Venus_PreprocessData.R
 \name{FilterRawData}
 \alias{FilterRawData}
-\title{Filter out unnecessary or pilot data
-Then assign "conditions"
-Condition 1: No bias condition. fail/switch and succeed/stay probabilities are set to 50%
-Condition 2: fail/switch probability set at 80%, succeed/stay at 50%
-Condition 3: fail/switch probability set at 50%, succeed/stay at 80%
-Function to load data. It only loads what's here}
+\title{Filter out unnecessary or pilot data}
 \usage{
 FilterRawData(rawData)
 }
 \description{
+Then assign "conditions"
+Condition 1: No bias condition. fail/switch and succeed/stay probabilities are set to 50%
+Condition 2: fail/switch probability set at 80%, succeed/stay at 50%
+Condition 3: fail/switch probability set at 50%, succeed/stay at 80%
+Function to load data. It only loads what's here
+}
+\details{
 FilterRawData()
 }
 
