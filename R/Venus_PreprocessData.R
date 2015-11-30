@@ -77,7 +77,8 @@ FilterRawData <- function(rawData)   	# Input data set that will be filtered
   return(rawData)
 }
 
-######################### --- ClassifyRawData --- #############################
+#' Classify raw data
+#'
 #' Assign "Conditions"
 #' Condition 1: No bias condition. fail/switch and succeed/stay probabilities are set to 50%
 #' Condition 2: fail/switch probability set at 80%, succeed/stay at 50%. !!!IMPORTANT. This is to induce fail/stay bias, because when we switch after fail, we end up on same side where fail was.
@@ -193,6 +194,76 @@ ClassifyRawData <- function(rawData)   	# Input data set that will be filtered
   #### Subject 27 (UCL)
   rawData$Condition[with(rawData, (SubjectID=='s027') & (OriginalSessionID %in% c(1, 2, 3)))] <- 13
 
+  #### Subject 30 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s030') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s030') & (OriginalSessionID %in% c(4, 5, 6)))] <- 7  # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s030') & (OriginalSessionID %in% c(7, 8, 9)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s030') & (OriginalSessionID %in% c(10, 11, 12)))] <- 8
+  rawData$Condition[with(rawData, (SubjectID=='s030') & (OriginalSessionID %in% c(13, 14, 15)))] <- 2 # Swapped 7 and 2
+  #### Subject 31 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s031') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s031') & (OriginalSessionID %in% c(4, 5, 6)))] <- 2 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s031') & (OriginalSessionID %in% c(7, 8, 9)))] <- 8
+  rawData$Condition[with(rawData, (SubjectID=='s031') & (OriginalSessionID %in% c(10, 11, 12)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s031') & (OriginalSessionID %in% c(13, 14, 15)))] <- 7 # Swapped 7 and 2
+  #### Subject 32 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s032') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s032') & (OriginalSessionID %in% c(4, 5, 6)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s032') & (OriginalSessionID %in% c(7, 8, 9)))] <- 7 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s032') & (OriginalSessionID %in% c(10, 11, 12)))] <- 2 # Swapped 7 and 2
+  #### Subject 33 (Stanford) EXCLUDE, because after looking at psychophysics curves found they didn't do the task
+#   rawData$Condition[with(rawData, (SubjectID=='s033') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+#   rawData$Condition[with(rawData, (SubjectID=='s033') & (OriginalSessionID %in% c(4, 5, 6)))] <- 3
+#   rawData$Condition[with(rawData, (SubjectID=='s033') & (OriginalSessionID %in% c(7, 8, 9)))] <- 8
+#   rawData$Condition[with(rawData, (SubjectID=='s033') & (OriginalSessionID %in% c(10, 11, 12)))] <- 2 # Swapped 7 and 2
+  #### Subject 34 (Stanford) EXCLUDE, because after looking at psychophysics curves found they didn't do the task
+#   rawData$Condition[with(rawData, (SubjectID=='s034') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+#   rawData$Condition[with(rawData, (SubjectID=='s034') & (OriginalSessionID %in% c(4, 5, 6)))] <- 8
+#   rawData$Condition[with(rawData, (SubjectID=='s034') & (OriginalSessionID %in% c(7, 8, 9)))] <- 2 # Swapped 7 and 2
+#   rawData$Condition[with(rawData, (SubjectID=='s034') & (OriginalSessionID %in% c(10, 11, 12)))] <- 3
+#   rawData$Condition[with(rawData, (SubjectID=='s034') & (OriginalSessionID %in% c(13, 14, 15)))] <- 7 # Swapped 7 and 2
+  #### Subject 35 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s035') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s035') & (OriginalSessionID %in% c(4, 5, 6)))] <- 2 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s035') & (OriginalSessionID %in% c(7, 8, 9)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s035') & (OriginalSessionID %in% c(10, 11, 12)))] <- 7 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s035') & (OriginalSessionID %in% c(13, 14, 15)))] <- 8
+  #### Subject 36 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s036') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s036') & (OriginalSessionID %in% c(4, 5, 6)))] <- 7 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s036') & (OriginalSessionID %in% c(7, 8, 9)))] <- 2 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s036') & (OriginalSessionID %in% c(10, 11, 12)))] <- 8
+  rawData$Condition[with(rawData, (SubjectID=='s036') & (OriginalSessionID %in% c(13, 14, 15)))] <- 3
+  #### Subject 37 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s037') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s037') & (OriginalSessionID %in% c(4, 5, 6)))] <- 2 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s037') & (OriginalSessionID %in% c(7, 8, 9)))] <- 7 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s037') & (OriginalSessionID %in% c(10, 11, 12)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s037') & (OriginalSessionID %in% c(13, 14, 15)))] <- 8
+  #### Subject 38 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s038') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s038') & (OriginalSessionID %in% c(4, 5, 6)))] <- 7 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s038') & (OriginalSessionID %in% c(7, 8, 9)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s038') & (OriginalSessionID %in% c(10, 11, 12)))] <- 8
+  rawData$Condition[with(rawData, (SubjectID=='s038') & (OriginalSessionID %in% c(13, 14, 15)))] <- 2 # Swapped 7 and 2
+  #### Subject 39 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s039') & (OriginalSessionID %in% c(1, 2, 3, 4, 5, 6)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s039') & (OriginalSessionID %in% c(7, 8, 9)))] <- 2 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s039') & (OriginalSessionID %in% c(10, 11, 12)))] <- 7 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s039') & (OriginalSessionID %in% c(13, 14, 15)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s039') & (OriginalSessionID %in% c(16, 17, 18)))] <- 8
+  #### Subject 40 (Stanford) - EXCLUDE, because after looking at psychophysics curves found they didn't do the task
+#   rawData$Condition[with(rawData, (SubjectID=='s040') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+#   rawData$Condition[with(rawData, (SubjectID=='s040') & (OriginalSessionID %in% c(4, 5, 6)))] <- 8
+#   rawData$Condition[with(rawData, (SubjectID=='s040') & (OriginalSessionID %in% c(7, 8, 9)))] <- 7 # Swapped 7 and 2
+#   rawData$Condition[with(rawData, (SubjectID=='s040') & (OriginalSessionID %in% c(10, 11, 12)))] <- 2 # Swapped 7 and 2
+#   rawData$Condition[with(rawData, (SubjectID=='s040') & (OriginalSessionID %in% c(13, 14, 15)))] <- 3
+  #### Subject 41 (Stanford)
+  rawData$Condition[with(rawData, (SubjectID=='s041') & (OriginalSessionID %in% c(1, 2, 3)))] <- 1
+  rawData$Condition[with(rawData, (SubjectID=='s041') & (OriginalSessionID %in% c(4, 5, 6)))] <- 8
+  rawData$Condition[with(rawData, (SubjectID=='s041') & (OriginalSessionID %in% c(7, 8, 9)))] <- 3
+  rawData$Condition[with(rawData, (SubjectID=='s041') & (OriginalSessionID %in% c(10, 11, 12)))] <- 7 # Swapped 7 and 2
+  rawData$Condition[with(rawData, (SubjectID=='s041') & (OriginalSessionID %in% c(13, 14, 15)))] <- 2 # Swapped 7 and 2
   return(rawData)
 }
 

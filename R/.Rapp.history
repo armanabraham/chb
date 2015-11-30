@@ -1,0 +1,43 @@
+require(rgl)#
+#
+col1 <- rainbow(length(bivn.kde$z))[rank(bivn.kde$z)]#
+col2 <- heat.colors(length(bivn.kde2$z))[rank(bivn.kde2$z)]#
+persp3d(x=bivn.kde, col = col1)#
+with(bivn.kde2, surface3d(x,y,z, color = col2))
+bivn <- mvrnorm(1000, mu = c(0, 0), Sigma = matrix(c(1, .5, .5, 1), 2))#
+bivn2 <- mvrnorm(1000, mu = c(0, 0), Sigma = matrix(c(1.5, 1.5, 1.5, 1.5), 2))#
+#
+# now we do a kernel density estimate#
+bivn.kde <- kde2d(bivn[,1], bivn[,2], n = 50)#
+bivn.kde2 <- kde2d(bivn2[,1], bivn[,2], n = 50)#
+#
+# fancy perspective
+library(MASS)
+bivn <- mvrnorm(1000, mu = c(0, 0), Sigma = matrix(c(1, .5, .5, 1), 2))#
+bivn2 <- mvrnorm(1000, mu = c(0, 0), Sigma = matrix(c(1.5, 1.5, 1.5, 1.5), 2))#
+#
+# now we do a kernel density estimate#
+bivn.kde <- kde2d(bivn[,1], bivn[,2], n = 50)#
+bivn.kde2 <- kde2d(bivn2[,1], bivn[,2], n = 50)#
+#
+# fancy perspective
+col1 <- rainbow(length(bivn.kde$z))[rank(bivn.kde$z)]#
+col2 <- heat.colors(length(bivn.kde2$z))[rank(bivn.kde2$z)]#
+persp3d(x=bivn.kde, col = col1)#
+with(bivn.kde2, surface3d(x,y,z, color = col2))
+help(package='rgl')
+persp3d(x=bivn.kde, col = col1)
+persp3d(x=bivn.kde, col = col1)
+bivn.kde
+?persp3d
+persp3d(x = seq(0, 1, len = nrow(z)), y = seq(0, 1, len = ncol(z)), z,#
+    xlim = range(x, na.rm = TRUE), #
+    ylim = range(y, na.rm = TRUE), #
+    zlim = range(z, na.rm = TRUE),#
+    xlab = NULL, ylab = NULL, zlab = NULL, add = FALSE, aspect = !add, ...)
+persp3d(x = seq(0, 1, len = nrow(z)), y = seq(0, 1, len = ncol(z)), z,#
+    xlim = range(x, na.rm = TRUE), #
+    ylim = range(y, na.rm = TRUE), #
+    zlim = range(z, na.rm = TRUE),#
+    xlab = NULL, ylab = NULL, zlab = NULL, add = FALSE, aspect = !add)
+example(persp3d)

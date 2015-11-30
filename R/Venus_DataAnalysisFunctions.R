@@ -1,5 +1,5 @@
 ## Functions for analysing choice history biases
-#' @import ggplot2 ggthemes Hmisc
+#' @import ggplot2 ggthemes Hmisc aapack
 #library(car)
 #library(psyphy) ## To use fitting of curves with asymptotes
 #library(RColorBrewer)
@@ -7,8 +7,8 @@
 #library(grid)
 
 # Themes for publication quality figures
-source('~/Desktop/Dropbox/R/Lib/PublishingThemes.R')
-source('~/Desktop/Dropbox/R/Lib/StandardErrorsByWinstonChan.R')
+#source('~/Desktop/Dropbox/R/Lib/PublishingThemes.R')
+#source('~/Desktop/Dropbox/R/Lib/StandardErrorsByWinstonChan.R')
 
 ## Defining variables to use throughout
 ## When alpha is 0, run "ridge" regularization. When alpha is set to 1, run "lasso" regularization
@@ -27,8 +27,103 @@ prevSuccessColor <- '#2b83ba'
 # prevFailColor <- 'b62813'
 # prevSuccessColor <- 'a7b112'
 
-#' **************************
-#' *** stub for glmnet that accepts a formula
+
+
+#' Subject demographics such as age and education
+#'
+#' @export
+SubjectDemographics <- function(getAge=TRUE,
+                                getGender=TRUE,
+                                getEducation=TRUE)
+{
+  subjectID <- c("s001", "s002", "s003", "s004", "s005", "s006", "s007", "s008",
+                 "s009", "s010", "s011", "s012", "s013", "s014", "s015", "s016",
+                 "s017", "s018", "s019", "s020", "s021", "s022", "s023", "s024",
+                 "s025", "s026", "s027",
+                 "s030", "s031", "s032", "s033", "s034", "s035", "s036", "s037",
+                 "s038", "s039", "s040", "s041")
+  demographics <- data.frame(SubjectID=subjectID)
+
+  if (getAge) {
+    age <- c(38, 36, 32, 21, 33, 31, 28, 29, 37, 28, 35, 35, 32, 22, 25,
+             NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA,
+             21, 36, 25, 19, 32, 24, 22, 21,
+             20, 19, 27, 27)
+    demographics <- cbind(demographics, Age=age)
+  }
+  # Subject degrees
+  # s001 - Arman Abrahamyan					PhD
+  # s002 - Georgios Keliris					PhD
+  # s003 - Andrew Meso						PhD
+  # s004 - Mackenzie Dolginow				Undergrad
+  # s005 - Kenji Haruhana					Undergrad
+  # s006 - Ilias Rentzeperis				PhD
+  # s007 - Steeve Laquitaine				PhD
+  # s008 - Katharina Dobs					Grad
+  # s009 - Tancy Kao					PhD
+  # s010 - Li Feng Yi					Grad
+  # s011 - Erin Munro					PhD
+  # s012 - Yuka Okazaki					PhD
+  # s013 - Siva Kaveri					Grad
+  # s014 - Darren Seibert (Summer School student)		Grad
+  # s015 - Stephen Bruggemann (Summer School student)	Undergrad
+  if (getEducation) {
+    demographics <- cbind(demographics, Education=rep(NA, length(subjectID)))
+    phds <- c("s001", "s002", "s003", "s006", "s007", "s008",
+              "s009", "s010", "s011", "s012", "s013", "s014",
+              "s016", "s017", "s018", "s019", "s020", "s031",
+              "s032", "s036", "s041")
+    demographics$Education[demographics$SubjectID %in% phds] <- "PhD"
+
+    noPhds <- c("s004", "s005", "s015", "s021",
+                "s022", "s023", "s024", "s025",
+                "s026", "s027",
+                "s030", "s031", "s033", "s034",
+                "s035", "s037", "s038", "s039", "s040")
+    demographics$Education[demographics$SubjectID %in% noPhds] <- "No PhD"
+    demographics$Education <- as.factor(demographics$Education)
+
+  }
+
+  if (getGender) {
+    demographics <- cbind(demographics, Gender=rep(NA, length(subjectID)))
+    females <- c("s004", "s008", "s009", "s011", "s012", "s030", "s033", "s035", "s036", "s037", "s038", "s039", "s041")
+    demographics$Gender[demographics$SubjectID %in% females] <- "F"
+    males <- c("s001", "s002", "s003", "s005", "s006", "s007", "s010", "s013", "s014", "s015", "s031", "s032", "s034", "s040")
+    demographics$Gender[demographics$SubjectID %in% males] <- "M"
+  }
+
+  return(demographics)
+}
+
+#' Compute correlation between age and bias
+#'
+#' @export
+CorrelateAgeAndBias <- function(sbjInfo, biases) {
+  meanBias <- subset(biases, Parameter %in% c('PrevFail1', 'PrevCorr1') & Regularized=='yes')
+  meanBias <- ddply(meanBias, .(SubjectID, Condition, Parameter), numcolwise(mean))
+  meanBiasWide <- cast(meanBias, SubjectID+Condition~Parameter, value=.(Weight))
+  biasAndAge <- merge(meanBiasWide, sbjInfo)
+  biasAndAge <- ddply(biasAndAge, .(SubjectID, Condition), transform, AbsBias=abs(PrevFail1) + abs(PrevCorr1))
+  print(biasAndAge)
+  # Plot correlations
+  g1 <- qplot(biasAndAge$Age, biasAndAge$PrevFail1) + theme_publish1() + geom_smooth(method='lm', se=FALSE, color='grey50') + xlab("Age") + ylab("Fail bias")
+  g2 <- qplot(biasAndAge$Age, biasAndAge$PrevCorr1) + theme_publish1() + geom_smooth(method='lm', se=FALSE, color='grey50') + xlab("Age") + ylab("Success bias")
+  g3 <- qplot(biasAndAge$Age, biasAndAge$AbsBias) + theme_publish1() + geom_smooth(method='lm', se=FALSE, color='grey50') + xlab("Age") + ylab("Absolute bias")
+  library(gridExtra)
+  grid.arrange(g3, g1, g2, ncol=1)
+  # Select only subjects whose age is registered
+  biasAndAge <- biasAndAge[!is.na(biasAndAge$Age), ]
+  print(cor.test(biasAndAge$Age, biasAndAge$AbsBias))
+  print(cor.test( biasAndAge$Age, biasAndAge$PrevCorr1))
+  print(cor.test(biasAndAge$Age, biasAndAge$PrevFail1))
+  #   qplot(biasAndAge$Age, biasAndAge$PrevFail1) +
+  #     stat_smooth(stat='lm', se=FALSE)
+}
+
+
+#' Stub for glmnet that accepts a formula
+#'
 #' Adapted from a book (NEED TO CHECK THE REF)
 #' @import glmnet
 #' @export
@@ -49,8 +144,8 @@ Glmnet <- function(formula, data, subset, na.action, ...) {
 	#browser()
 }
 
-#' **************************
-#' *** stub for glmnet cross-validation that accepts a formula
+#' Stub for glmnet cross-validation that accepts a formula
+#'
 #' @import glmnet
 #' @export
 CV.glmnet <- function(formula, data, subset, na.action, ...) {
@@ -84,9 +179,10 @@ Likelihood <- function(y,     # Participant responses
   -2*sum(log(ifelse(y==1, pRight, 1 - pRight)))
 }
 
-#' BuldDataForGLM
-#' *** FUNCTION to prepare all necessary columns and fill in data for the GLM analysis
-#' *** Previous success and previous failure (history terms) columns are also constructed here
+#' Prepare data for GLM analysis
+#'
+#' Build all necessary columns and fill in data for the GLM analysis
+#' Previous success and previous failure (history terms) columns are also constructed here
 #' @export
 BuilDataForGLM <- function(rawData, 		# Input data frame
                            nHistoryBack, 	# Depth of constructing previous success and previous failure variables. 1 means one trial back, and 2 means 2 trials back
@@ -199,7 +295,8 @@ BuilDataForGLM <- function(rawData, 		# Input data frame
   return(finalGLMData)
 }
 
-#' Tidy up rawData
+#' Enrich rawData with helper columns
+#'
 #' Previous success and previous failure (history terms) columns are also constructed here
 #' @export
 PrepareRawData <- function(rawData 		# Input data frame
@@ -241,7 +338,9 @@ PrepareRawData <- function(rawData 		# Input data frame
 }
 
 
-#' Fit model parameters using regulirized logistic regression (glmnet)
+#' Fit model parameters
+#'
+#' Uses regulirized logistic regression (glmnet)
 #' @export
 FitRegulirizedLogisticRegression <- function (glmData, 			        # subject responses
                                               lambdas, 			        #
@@ -423,7 +522,10 @@ ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with diff
 }
 
 
-#' Function that computes weights for all lambdas (not just the best lambdas as the above function)
+#' Model weight for each lambda
+#'
+#' Function that computes weights for all lambda regularization
+#' parameters
 #' @export
 GetWeightsWithAllLambdas <- function(performance,
                                      lambdas, 		# Lambda values used in regularized
@@ -489,8 +591,9 @@ GetWeightsWithAllLambdas <- function(performance,
 
 
 #' Compute correlation matrices for each parameter of the GLM model
-#' This helps to check if there are any strong effects of multicolinearity
-# @export
+#'
+#' Helps to check if there are any strong effects of multicolinearity
+#' @export
 CorrelationMatrixOfParameters <- function(glmData) {
 	allCorrelations <- data.frame(SubjectID=as.character(), SessionID=as.character(), Condition=as.integer())
 	for (ixSubject in levels(droplevels(glmData$SubjectID))) {
@@ -516,7 +619,8 @@ CorrelationMatrixOfParameters <- function(glmData) {
 }
 
 
-#' Function to compute how long were sequences of stimuli either on L or R sides.
+#' Compute length of sequences on left or right sides
+#'
 #' This is to figure out if there are long sequences, particularly when introducing biases
 #' such as succeed/stay bias which can generate long sequences on one side
 #' @export
@@ -542,45 +646,17 @@ StimulusSideSequences <- function(glmData) {
   return(allSequences)
 }
 
-#' Function to plot Variance Inflation Factor (VIF)
-#' @export
-PlotVIFs <- function(allWeights) {
-  vifsOnly <- allWeights[!is.na(allWeights$Vif),] # Pick rows that only contain VIFs
-  vifData <- vifsOnly[c("SubjectID", "SessionID", "Condition", "Parameter", "Vif")]
-  ggplot(data=vifData, aes(x=Parameter, y=Vif)) +
-    theme_few() +
-    ggtitle("Variance Inflation Factor (VIF). \n Non-shaded panels have fail/switch probability set at 80% (Condition 2). \n Shaded panels have success/stay probability set at 80% (Condition 3)") +
-    geom_bar(stat="identity", position="dodge") +
-    geom_rect(data = subset(vifData, Condition == 3), aes(fill=Condition), xmin = -Inf,xmax = Inf, ymin = -Inf,ymax = Inf,alpha = 0.02) +
-    geom_hline(yintercept = 1, size = 0.5, colour = "orange", linetype = "dashed") +
-    theme(axis.text.x = element_text(angle=45, vjust=1, hjust=1)) +
-    theme(legend.position="none") +
-    facet_wrap(SubjectID~Condition~SessionID, ncol=6)
-}
 
-#' Function to plot stimulus intensities during switching or staying behaviours
-#' @export
-PlotContrastPairs <- function(contrastPairs, plotTitle) {
-  ggplot(data=contrastPairs, aes(x=factor(failIntensity*100), y= factor(nextIntensity*100))) +
-    geom_tile(aes(fill= 100*prcntSwitch)) +
-    theme_few() +
-    facet_wrap(~SubjectID, scale="free") +
-    #scale_fill_gradient(low="#f7f500", high="#d80570", na.value="black") +
-    #scale_fill_gradient2(low="#FEE8C8", mid="#FDBB84", high="#E34A33") +
-    #scale_fill_gradient(low="#FEE8C8", high="#E34A33", na.value="black") +
-    scale_fill_gradientn(colours=c("#FEF0D9", "#FDCC8A", "#E34A33", "#B30000")) +
-    labs(fill="% switches") +
-    scale_x_discrete("Contrast when failed (%)", expand=c(0,0)) +
-    scale_y_discrete("Contrast when switched (%)", expand=c(0,0)) +
-    geom_text(aes(label=nTotalSwitches, color=nTotalSwitches), size=4) +
-    scale_color_gradient(low="white", high="black", guide="none") +
-    ggtitle(plotTitle)
-}
-
-
-#' Compute history weights after either shuffling trial order or shuffling
+#' Compute weights after randomizing trials or responses
 #'
-#' responses to each trial. to computing by either scrambling the order of
+#' This is checker function to ensure that history weights do indeed
+#' disapper after trial order is made random or subjects responses are made
+#' random. This randomization effectively destroys history effects effectively
+#' setting history weights to 0.
+#' !!! CHECK IF YOU HAVE ANOTHER FUNCTION THAT DOES THIS!!!! It is a suspect, because
+#' uses rawData as input and not glmData, which is much more clean data.
+#' Again, compute history weights after either shuffling trial order or shuffling
+#' responses to each trial, by either scrambling the order of
 #' trials, or by generating responses randomly. This procedure should
 #' decrease the history weights to 0. If we run this function many times we
 #' will get confidence intervals for history biases
@@ -629,7 +705,7 @@ BiasAfterRandomization <- function(rawData, 		# rawData as input
   scrambledRawData$y[ixIlligalResponses] = NaN
 
   # Assign y based on new set of simulated responses
-  ## Prepare GLM y response
+  # Prepare GLM y response
   scrambledRawData$y <- scrambledRawData$Response
   scrambledRawData$y[scrambledRawData$y == 1] <- -1
   scrambledRawData$y[scrambledRawData$y == 2] <- 1
@@ -657,16 +733,16 @@ BiasAfterRandomization <- function(rawData, 		# rawData as input
 #' to switch choice on next trial cause failure happened on the opposite side.
 #' @export
 ConditionLabels <- function(variable, value) {
-  if (variable=='Condition') {
+  if (variable=='Condition' | variable=='Condition.y') {
     newValue <- c()
     newValue[which(value==1)] <- 'Natural bias\n'
-    newValue[which(value==2)] <- 'Induced bias: p stay \n after failure 80%'
-    newValue[which(value==3)] <- 'Induced bias: p stay \n after success 80%'
+    newValue[which(value==2)] <- 'Fail-stay bias'
+    newValue[which(value==3)] <- 'Success-stay bias'
     newValue[which(value==4)] <- 'Natural bias: stim diam\n 6deg, eccnt 8deg'
     newValue[which(value==5)] <- 'Natural bias: stim diam\n 12deg, eccnt 12deg'
     newValue[which(value==6)] <- 'Natural bias: stim diam\n 6deg, eccnt 10deg'
-    newValue[which(value==7)] <- 'Induced bias: p switch \n after failure 80%'
-    newValue[which(value==8)] <- 'Induced bias: p switch \n after success 80%'
+    newValue[which(value==7)] <- 'Fail-switch bias'
+    newValue[which(value==8)] <- 'Success-switch bias'
     newValue[which(value==9)] <- 'Induced bias corr~incorr: \n p stay after failure 80%'
     newValue[which(value==10)] <- 'Induced bias corr~incorr: \n p stay after success 80%'
     newValue[which(value==11)] <- 'Induced bias corr~incorr: \n p switch after failure 80%'
@@ -738,426 +814,31 @@ ForestPlot <- function(plotData, 						# Data to plot
 }
 
 
-#' Plot both contrast and choice history weights
-#'
-#' A beautiful plot of all weights (contrast and history). Contrast weights are
-#' connected together, but history weights are not.
-#' @export
-PlotContrastAndHistoryWeights_OLD <- function(regularizedWeights,
-                                              plotByCondition=T,		# Plot by condition
-                                              legendPos=c(0.15,0.75),
-                                              plotInColor=F,
-                                              showAxisLabels=T,
-                                              figureWidth=6.382023,
-                                              figureHeight=8.678161) {
-
-  if (plotByCondition)
-    idealSbjParams <- ddply(regularizedWeights, .(SubjectID, Parameter, Condition), summarise,
-                            MeanWeight=mean(Weight),
-                            std=sd(Weight, na.rm=TRUE),
-                            n=sum(!is.na(Weight)),
-                            se=std/sqrt(n))
-
-  else  idealSbjParams <- ddply(regularizedWeights, .(SubjectID, Parameter), summarise,
-                                MeanWeight=mean(Weight),
-                                std=sd(Weight, na.rm=TRUE),
-                                n=sum(!is.na(Weight)),
-                                se=std/sqrt(n))
-
-  idealSbjParams$c0 <- grepl("c0", idealSbjParams$Parameter)
-
-  ## Sort contrast and history weights in the order that will make it intuitive to read the plot
-  paramNames <- levels(idealSbjParams$Parameter)
-  contrastNames <- sort(paramNames[grep("c0",paramNames)])
-  biasNames <- paramNames[!paramNames %in% contrastNames]
-  idealSbjParams$Parameter <- factor(idealSbjParams$Parameter, levels=unique(c(biasNames, contrastNames)))
-  browser()
-  if (plotInColor) {
-    p <- ggplot(idealSbjParams, aes(x=Parameter, y=MeanWeight, color = SubjectID, group = SubjectID))
-  } else {
-    p <- ggplot(idealSbjParams, aes(x=Parameter, y=MeanWeight))
-  }
-
-  p <- p + geom_hline(yintercept = 0, size = 0.5, colour = "grey70", linetype = "dashed")
-  #p <- p + geom_errorbar(subset = .(c0), aes(ymin=MeanWeight-se, ymax=MeanWeight+se), width=0.01, alpha=0.2)
-
-  #p <- p + geom_boxplot(aes(group=Parameter), subset = .(!c0), width=0.8, color="grey90", fill="grey90", alpha=0.9, outlier.size=0)
-
-  if (plotInColor) {
-    p <- p + geom_line(subset = .(c0), size=0.5) +
-      geom_point(subset = .(c0), size=6, shape=21, fill = "white", color = "white") +
-      geom_point(subset = .(c0), size=4) +
-      geom_point(subset = .(!c0), size=4)
-  } else {
-    # p <- p + geom_line(subset = .(c0), size=0.5, color="#bcbcbc") +
-    # geom_point(subset = .(c0), size=4, shape=21, fill = "#6f6f6f", color = "white") +
-    # geom_point(subset = .(!c0), size=4, shape=21, fill = "#6f6f6f", color = "white")
-
-    p <- p +
-      stat_summary(aes(group=1), subset = .(c0), fun.y="mean", geom="line", size=2, color="#d5d5d5") +
-      stat_summary(aes(group=Parameter), fun.data = "mean_cl_boot", B=1000, conf.int = 0.68, geom = "errorbar", size = 0.5, width = 0.1, color='#6f6f6f') +
-      #geom_point(subset = .(c0), size=1.5, color="#6f6f6f") +
-      #geom_point(subset = .(!c0), size=1.5, color="#6f6f6f") +
-      geom_point(aes(group=Parameter), subset = .(c0), size=6, color = "#6f6f6f", stat="summary", fun.y="mean") +
-      geom_point(aes(group=Parameter), subset = .(c0), size=3, color = "white", stat="summary", fun.y="mean") +
-      geom_point(aes(group=Parameter), subset = .(!c0), size=6, color = "#6f6f6f", stat="summary", fun.y="mean") +
-      geom_point(aes(group=Parameter), subset = .(!c0), size=3, color = "white", stat="summary", fun.y="mean")
-  }
-
-  #geom_point(subset = .(Parameter=='(Intercept)'), size=4) +
-  #geom_point(subset = .(Parameter=='PrevFail1'), size = 5, colour='#ff7f00') +
-  #geom_point(subset = .(Parameter=='PrevCorr1'), size = 5, colour='#b2df8a') +
-  #browser()
-  #scale_x_discrete(limits=c("PrevFail1", "PrevCorr1", "(Intercept)"), breaks=NULL) +
-  p <- p +
-    #scale_y_continuous(breaks=c(-2, -1, 0, 1, 2, 3, 4, 5, 6), expand=c(0,0.04)) +
-    coord_cartesian(ylim = c(-1.5, 7)) +
-    #scale_color_brewer(palette="Paired") +
-    theme_few() +
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank()) +
-    theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3)) +
-    theme(axis.ticks.x = element_line(colour = "#a9a9a9", size = 0.3), axis.ticks.y = element_line(colour = "#a9a9a9", size = 0.3)) +
-    theme(legend.position = legendPos)
-
-  if (showAxisLabels) {
-    p <- p + theme(axis.text.x=element_text(angle = 45, hjust = 1))
-  } else {
-    p <- p + theme(axis.text=element_blank(), axis.title=element_blank())
-  }
-
-  if (plotByCondition) p <- p + facet_grid(~Condition, labeller=ConditionLabels)
-
-  dev.new(width=figureWidth, height=figureHeight)
-  print(p)
-}
-
-
-#' Plot both contrast and choice history weights
-#'
-#' A beautiful plot of all weights (contrast and history). Contrast weights are
-#' connected together, but history weights are not.
-#' @export
-PlotContrastAndHistoryWeights <- function(regularizedWeights,
-                                          plotByCondition=T,		# Plot by condition
-                                          legendPos=c(0.15,0.75),
-                                          plotInColor=FALSE,
-                                          showAxisLabels=TRUE,
-                                          plotFigure=TRUE,      # Plot figure or return ggplot object
-                                          figureWidth=6.382023,
-                                          figureHeight=8.678161) {
-
-  if (plotByCondition)
-    idealSbjParams <- ddply(regularizedWeights, .(SubjectID, Parameter, Condition), summarise,
-                            MeanWeight=mean(Weight),
-                            std=sd(Weight, na.rm=TRUE),
-                            n=sum(!is.na(Weight)),
-                            se=std/sqrt(n))
-  else idealSbjParams <- ddply(regularizedWeights, .(SubjectID, Parameter), summarise,
-                                MeanWeight=mean(Weight),
-                                std=sd(Weight, na.rm=TRUE),
-                                n=sum(!is.na(Weight)),
-                                se=std/sqrt(n))
-
-  ## Sort contrast and history weights in the order that will make it intuitive to read the plot
-  paramNames <- levels(idealSbjParams$Parameter)
-  contrastNames <- sort(paramNames[grep("c0",paramNames)])
-  biasNames <- paramNames[!paramNames %in% contrastNames]
-  idealSbjParams$Parameter <- factor(idealSbjParams$Parameter, levels=unique(c(biasNames, contrastNames)))
-
-  ## Add grouping parameter that will be used to plot different weights in different colors
-  idealSbjParams$plotColor <-"Contrast"
-  idealSbjParams$plotColor[idealSbjParams$Parameter=="(Intercept)"] <- "Intercept"
-  idealSbjParams$plotColor[grep(successColName, idealSbjParams$Parameter)] <- "PrevSuccess"
-  idealSbjParams$plotColor[grep(failColName, idealSbjParams$Parameter)] <- "PrevFail"
-  colorValues <- c("#a4a4a4",prevSuccessColor, prevFailColor, "#6f6f6f")
-  names(colorValues) <- c("Intercept", "PrevSuccess", "PrevFail", "Contrast")
-  idealSbjParams$plotOrder <- 4
-  idealSbjParams$plotOrder[idealSbjParams$Parameter=="(Intercept)"] <- 1
-  idealSbjParams$plotOrder[idealSbjParams$Parameter=="PrevSuccess"] <- 2
-  idealSbjParams$plotOrder[idealSbjParams$Parameter=="PrevFail"] <- 3
-
-  p <- ggplot(idealSbjParams, aes(x=Parameter, y=MeanWeight)) +
-    theme_publish2() +
-    geom_rangeframe(color="grey30") +
-    #     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank()) +
-    #     theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3)) +
-    #     theme(axis.ticks.x = element_line(colour = "#a9a9a9", size = 0.3), axis.ticks.y = element_line(colour = "#a9a9a9", size = 0.3)) +
-    theme(legend.position = legendPos) +
-    geom_hline(yintercept = 0, size = 0.3, colour = "grey70", linetype = "dashed") +
-    stat_summary(aes(group=Parameter), fun.data = "mean_cl_boot", B=1000, conf.int = 0.68, geom = "errorbar", size = 0.5, width = 0.0, color="grey80") +
-    geom_blank() +
-    geom_line(subset = .(plotColor == "Contrast"), aes(group=1), stat="summary", fun.y="mean", color="grey70", size=1) +
-    geom_point(aes(group=Parameter), size=7, color="white", stat="summary", fun.y="mean") +
-    geom_point(aes(group=Parameter, color=plotColor), size=4, stat="summary", fun.y="mean") +
-    scale_colour_manual(values=colorValues) +
-    coord_cartesian(ylim = c(-1.2, 5.5)) +
-    scale_y_continuous(breaks=seq(-1, 6, 1))
-
-  if (showAxisLabels) {
-    p <- p + theme(axis.text.x=element_text(angle = 90, vjust=0.5))
-  } else {
-    p <- p + theme(axis.text=element_blank(), axis.title=element_blank())
-  }
-
-  if (plotByCondition) p <- p + facet_grid(~Condition, labeller=ConditionLabels, scales="free")
-
-  if (plotFigure) {
-    dev.new(width=figureWidth, height=figureHeight)
-    print(p)
-  } else {
-    return(p)
-  }
-}
-
-#' A scatterplot of choice history biases
-#'
-#' Plot 'prevFail' vs 'prevSuccess' weights in forms of scatterplot.
-#' @export
-HistoryWeightsScatterplot <- function(weights,  				# Regularized weights
-									  figureWidth=15.516854, 	# Width of the plot
-									  figureHeight=5.689655, 	# Height of the plot
-									  xlims=c(-3,3),
-									  ylims=c(-3,3),
-									  conditionsToPlot, 		# Condition numbers to be plotted
-									  plotByCondition=TRUE,		# Plot by Condition or collapsed across Condition
-									  plotSubjectMeans=FALSE,	# Compute means across Sessions for each subject and plots those means
-									  plotSubjectNames=FALSE, 	# Plot names of subjects next to each dot. Better to use when plotSubjectMeans=TRUE
-									  plotMeans=FALSE         # Mean weights for each Condition
-                     ) {
-
-
-	if (!missing(conditionsToPlot)) weights <- droplevels(subset(weights, Condition %in% conditionsToPlot))
-	## If asked for, only subset of conditions to plot
-
-	historyWeights <- subset(weights, Parameter=="PrevCorr1" | Parameter=="PrevFail1")
-  biases <- cast(historyWeights, SubjectID+SessionID+Condition ~ Parameter, value=.(Weight))
-
-	## Get means for each subject across all sessions
-  if (plotSubjectMeans) {
-		biases <- ddply(biases, .(SubjectID, Condition), summarise,
-						SePrevCorr1=sd(PrevCorr1)/sqrt(length(PrevCorr1)), 	# Standard error
-						SePrevFail1=sd(PrevFail1)/sqrt(length(PrevFail1)),	# Standard error
-						PrevCorr1=mean(PrevCorr1),
-						PrevFail1=mean(PrevFail1)
-						)
-	}
-
-	plottingColor <- "#a9a9a9"
-	p <- ggplot(data = biases, aes(x=PrevCorr1, y=PrevFail1))
-	## If only means for each subject are plotted, draw error bars first
-	if (plotSubjectMeans) {
-		p <- p + geom_errorbar(aes(ymin=PrevFail1-SePrevCorr1, ymax=PrevFail1+SePrevCorr1), color=plottingColor)
-		p <- p + geom_errorbarh(aes(xmin=PrevCorr1-SePrevFail1, xmax=PrevCorr1+SePrevFail1), color=plottingColor)
-	    p <- p + scale_fill_manual(values=colorRampPalette(brewer.pal(12, "Set1"))(15))
-	    p <- p + geom_point(aes(fill=SubjectID), size=3.5, shape=21, color="white")
-	} else {
-		p <- p + geom_point(size=3.5, shape=21, color="white", fill="#6a6a6a")
-	}
-
-	p <- p + geom_hline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "solid") +
-	        geom_vline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "solid") +
-	        coord_cartesian(xlim = xlims, ylim = ylims) +
-	        xlab("Weight success (Bs)") + ylab("Weight failure (Bf)") +
-			theme_few() +
-			theme(panel.grid=element_blank(), panel.border=element_blank()) +
-			theme(axis.line = element_line(colour="grey", size=0.5))
-
-	if (plotSubjectNames) {
-		p <- p + geom_text(aes(label=SubjectID), size=3, color=plottingColor, vjust=2.5)
-	}
-
-  if (plotMeans) {
-  	biasMeans <- ddply(biases, .(Condition), summarise,
-						SePrevCorr1=sd(PrevCorr1)/sqrt(length(PrevCorr1)), 	# Standard error
-						SePrevFail1=sd(PrevFail1)/sqrt(length(PrevFail1)),	# Standard error
-						PrevCorr1=mean(PrevCorr1),
-						PrevFail1=mean(PrevFail1)
-						)
-    p <- p + geom_point(data=biasMeans, size=7, alpha=0.5)
-  }
-	if (plotByCondition) {
-		p <- p + facet_grid(~Condition, labeller=ConditionLabels)
-	}
-	dev.new(width=figureWidth, height=figureHeight)
-	return(p)
-
-}
-
-
-#' Scatterplot of choice history weights grouped by Education
-#'
-#' This is a plot for the manuscript
-HistoryScatterplotByEducation <- function(weights,    			# Regularized weights
-                                          figureWidth=15.516854, 	  # Width of the plot
-                                          figureHeight=5.689655, 	  # Height of the plot
-                                          conditionsToPlot, 		      # Condition numbers to be plotted
-                                          plotMeansByEducation = F,  # Plot mean weights grouped by Education
-                                          plotByCondition=TRUE,		  # Plot by Condition or collapsed across Condition
-                                          plotSubjectMeans=FALSE,	  # Compute means across Sessions for each subject and plots those means
-                                          plotSubjectNames=FALSE 	  # Plot names of subjects next to each dot. Better to use when plotSubjectMeans=TRUE
-) {
-  # s001 - Arman Abrahamyan					PhD
-  # s002 - Georgios Keliris					PhD
-  # s003 - Andrew Meso						PhD
-  # s004 - Mackenzie Dolginow				Undergrad
-  # s005 - Kenji Haruhana					Undergrad
-  # s006 - Ilias Rentzeperis				PhD
-  # s007 - Steeve Laquitaine				PhD
-  # s008 - Katharina Dobs					Grad
-  # s009 - Tancy Kao					PhD
-  # s010 - Li Feng Yi					Grad
-  # s011 - Erin Munro					PhD
-  # s012 - Yuka Okazaki					PhD
-  # s013 - Siva Kaveri					Grad
-  # s014 - Darren Seibert (Summer School student)		Grad
-  # s015 - Stephen Bruggemann (Summer School student)	Undergrad
-
-  weights$Education <- "NoEducation"
-  weights$Education[weights$SubjectID %in% c("s001", "s002", "s003", "s006", "s007", "s008",
-                                             "s009", "s010", "s011", "s012", "s013", "s014",
-                                             "s016", "s017", "s018", "s019", "s020")] <- "PhD"
-  weights$Education[weights$SubjectID %in% c("s004", "s005", "s015", "s021",
-                                             "s022", "s023", "s024", "s025",
-                                             "s026", "s027")] <- "No PhD"
-  ## Joined grads and PhD's together
-  #weights$Education[weights$SubjectID %in% c("s008", "s010", "s013", "s014")] <- "Grad"
-
-
-  if (!missing(conditionsToPlot)) weights <- droplevels(subset(weights, Condition %in% conditionsToPlot))
-  ## If asked for, only subset of conditions to plot
-
-  historyWeights <- subset(weights, Parameter=="PrevCorr1" | Parameter=="PrevFail1")
-  biases <- cast(historyWeights, SubjectID+SessionID+Condition+Education ~ Parameter, value=.(Weight))
-
-  ## Get means for each subject across all sessions
-  if (plotSubjectMeans) {
-    biases <- ddply(biases, .(SubjectID, Condition, Education), summarise,
-                    SePrevCorr1=sd(PrevCorr1)/sqrt(length(PrevCorr1)), 	# Standard error
-                    SePrevFail1=sd(PrevFail1)/sqrt(length(PrevFail1)),	# Standard error
-                    PrevCorr1=mean(PrevCorr1),
-                    PrevFail1=mean(PrevFail1))
-  }
-  plottingColor <- "#a9a9a9"
-  errorbarColor <- "grey50"
-
-  if (plotMeansByEducation) {
-    geomPointSize <- 5
-    alpha <- 1
-  } else {
-    geomPointSize <- 5
-    alpha <- 1
-  }
-  p <- ggplot(data = biases, aes(x=PrevCorr1, y=PrevFail1))
-  p <- p + geom_hline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed") +
-    geom_vline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed")
-  ## If only means for each subject are plotted, draw error bars first
-  if (plotSubjectMeans) {
-    #     if (!plotMeansByEducation)  {
-    p <- p + geom_errorbar(aes(ymin=PrevFail1-SePrevCorr1, ymax=PrevFail1+SePrevCorr1), color=errorbarColor, width=0, size=0.3)
-    p <- p + geom_errorbarh(aes(xmin=PrevCorr1-SePrevFail1, xmax=PrevCorr1+SePrevFail1), color=errorbarColor, height=0, size=0.3)
-    #     }
-    p <- p + scale_fill_manual(values=c("#fdae61", "#d7191c"))  # blue 2c7bb6
-    p <- p + geom_point(aes(fill=Education), size=geomPointSize, shape=21, color="white", alpha=alpha)
-  } else {
-    p <- p + geom_point(aes(fill=Education), size=geomPointSize, shape=21, color="white", alpha=alpha)
-  }
-
-  p <- p + coord_fixed(xlim = c(-2.5, 2.5), ylim = c(-2.5, 2.5)) +
-    #p <- p + coord_fixed(xlim = c(-2.2, 2.2), ylim = c(-2.5, 1)) +
-    xlab("Success bias") + ylab("Failure bias") +
-    theme_publish2() +
-    geom_rangeframe()
-  #theme(panel.grid=element_blank(), panel.border=element_blank()) +
-  #theme(axis.line = element_line(colour="grey", size=0.5)) +
-  #theme(axis.text=element_text(size=12, face="bold"))
-
-  if (plotSubjectNames) {
-    p <- p + geom_text(aes(label=SubjectID), size=3, color=plottingColor, vjust=2.5)
-  }
-  # Show means by education
-  #if (!plotMeansByEducation) {
-  meansByEducation <- ddply(biases, .(Education), summarise,
-                            SePrevCorr1=sd(PrevCorr1)/sqrt(length(PrevCorr1)),   # Standard error
-                            SePrevFail1=sd(PrevFail1)/sqrt(length(PrevFail1)),	# Standard error
-                            PrevCorr1=mean(PrevCorr1),
-                            PrevFail1=mean(PrevFail1))
-  #p <- p + geom_errorbar(data=meansByEducation, aes(ymin=PrevFail1-SePrevCorr1, ymax=PrevFail1+SePrevCorr1), color=errorbarColor, width=0)
-  #p <- p + geom_errorbarh(data=meansByEducation, aes(xmin=PrevCorr1-SePrevFail1, xmax=PrevCorr1+SePrevFail1), color=errorbarColor, height=0)
-  p <- p + geom_point(data=meansByEducation, aes(group=Education, fill=Education), size=9, shape=21, color="white", alpha=0.5)
-  #}
-
-  # Separate by Condition
-  if (plotByCondition) {
-    p <- p + facet_grid(~Condition, labeller=ConditionLabels)
-  }
-  #dev.new(width=figureWidth, height=figureHeight)
-
-  #browser()
-  # Run 2x2 ANOVA to compare PhDs vs NoPhDs
-  biasesMelt <- melt(biases, id=c('SubjectID', 'Education'), measure.var=c('PrevCorr1', 'PrevFail1'))
-  colnames(biasesMelt) <- c("SubjectID", "Education", "Biases",  "Weight")
-  biasesMelt$Biases <- as.factor(biasesMelt$Biases)
-  biasesMelt$Education <- as.factor(biasesMelt$Education)
-
-  # Plot biases by education
-  biasesMeltSummary <- summarySEwithin(biasesMelt,
-                                       measurevar='Weight',
-                                       withinvars='Biases',
-                                       betweenvars='Education',
-                                       idvar='SubjectID')
-  dev.new(width=5, height=6.744681)
-  ggplot(biasesMeltSummary, aes(x=Education, y=Weight, color=Biases)) +
-    theme_publish2() +
-    theme(legend.position=c(0.70, 0.9)) +
-    scale_color_manual(values=c("#fdae61", "#d7191c")) +
-    geom_errorbar(aes(ymin = Weight - se, ymax = Weight + se), width = 0.00, size = 0.2) +
-    geom_hline(aes(yintercept=0), linetype='dashed', color='grey50', size=0.2) +
-    geom_point(size=4) +
-    geom_line(aes(group=Biases))
-
-  #aov(data=biasesMelt, Weight~SubjectID)
-  library(afex)
-  aovCar <- aov.car(data=biasesMelt, Weight~Education*Biases+Error(SubjectID/(Biases)),
-                    return="Anova", args.return=list(es="pes"),
-                    type=3)
-  nice.anova(aovCar, es="pes")
-
-  library(ez)
-  ezANOVA(data=biasesMelt, wid=.(SubjectID), dv=.(Weight),
-          within=.(Biases),
-          between=.(Education),
-          type=2,
-          detailed=TRUE) #To confirm the same using packages ez
-
-
-  return(p)
-
-}
 
 
 #' Fit probit function
 #'
 #' Fit probit (cummmulative Gaussian). The best fit after Weibull (with
 #' log transformed contrast values)
-FitProbit <- function(data) {
-	glm(data=data, cbind(nYesR, nNoR)~Contrast, binomial(probit))
+FitProbit <- function(dat) {
+	glm(data=dat, cbind(nYesR, nNoR)~Contrast, binomial(probit))
 }
 
 #' Fit probit function
 #'
 #' Fit logistic function
-FitLogit <- function(data) {
-	glm(data=data, cbind(nYesR, nNoR)~Contrast, binomial(logit))
+FitLogit <- function(dat) {
+	glm(data=dat, cbind(nYesR, nNoR)~Contrast, binomial(logit))
 }
 
 #' Fit Weibull function
 #'
 #' Fit Weibull without log transforming contrast values
 #' AVOID using this because the fit is poor
-FitWeibull <- function(data) {
+FitWeibull <- function(dat) {
   ## AVOID using this because the fit is poor
   ## Instead use FitWeibullLogContrast
-  glm(data=data, cbind(nYesR, nNoR)~Contrast, binomial(cloglog))
+  glm(data=dat, cbind(nYesR, nNoR)~Contrast, binomial(cloglog))
 }
 
 
@@ -1173,36 +854,49 @@ FitWeibullLogContrast <- function(data) {
 }
 
 
-#' Compute threshold of psychometric function which was fitted with probit
+#' Compute contrast threshold using fitted probit model
 #'
-#' Takes in a glm object and probability at which to estimate the threshold
+#' Estimates contrast intensities which generate response
+#' at probablity p (can be an array). The fitted psychometric
+#' parameters are in model glm.
+#'
+#' @param p either a single value or an array of probabilities for which contrast thresholds will be computed
+#' @param model a glm object of fitted probit psychometric curve
 ProbitThreshold <- function(p,        # probability
                             model){   # glm object
   coefs <- coef(model)
   nhu <- -coefs[1]/coefs[2]   # mean of Gaussian
   sigma <- 1/coefs[2]         # standard deviation of Gaussian
-  qnorm(p, nhu, sigma)
+  thP <- qnorm(p, nhu, sigma)
+  th50 <- qnorm(0.5, nhu, sigma)
+  # Threshold is contrast increment that will raise the threshold from 50% to p percent
+  th <- thP - th50
+  # If p=50% was requested, return 50% threshold as is, without subtract from itself
+  # which will make it 0
+  th[p==0.5] <- th50
+  return(th)
 }
 
 # CONTINUE FROM HERE
 ####################################################################################
+## DON"T USE THIS. The most accurate threshold estimation is for probit.
 ## Compute threshold and slope of psychometric function which was fitted with a
 ## Weilbull. takes in a glm object and probability at which to estimate the threshold
 ## Adapted from "Modelling Psychophysical Data in R", p. 155
 WeibullThAndSlope <- function(p,        # probability at which to compute the contrast
-                            model)		  # glm object
+                              model)		  # glm object
 {  # This was added to GLM model to aid log transform of negative contrast values
-	if (length(p) > 1) {
-		print("*WeibullThAndSlope* Please provide only one p value")
-		return()
-	}
+  if (length(p) > 1) {
+    print("*WeibullThAndSlope* Please provide only one p value")
+    return()
+  }
   ## Extracting fitted parameters
-	ln10 <- log(10) ## This is to backtransform Contrast from log10 to original values
-	coefs <- coef(model)
-	th <- qweibull(p, shape=coefs[2]/ln10, scale=exp(-ln10 * coefs[1]/coefs[2])) - offset
-	browser()
+  ln10 <- log(10) ## This is to backtransform Contrast from log10 to original values
+  coefs <- coef(model)
+  th <- qweibull(p, shape=coefs[2]/ln10, scale=exp(-ln10 * coefs[1]/coefs[2])) - offset
+  browser()
   weibParams <- c(th, coefs[2]/ln10)
-	names(weibParams) <- c("th", "slope")
+  names(weibParams) <- c("th", "slope")
   weibParams
 }
 
@@ -1678,8 +1372,8 @@ RemoveLastTrialsFromRun <- function(dat) {
 ## when inducing bias in success/stay condition.
 PlotSuccessFailOnEachSide <- function(inputData,   	 	# Input data in the format of "glmData"
                                       plotResults=F, 	# If False, returns list of ggplot objects. If True, plots those objects, each subject in separate window
-									  plotInColor=T		# Success and failure are marked by two different colors. Otherwise, black and white
-									  ){
+                                      plotInColor=T		# Success and failure are marked by two different colors. Otherwise, black and white
+){
   ## Add column with trial numbers
   inputData <- droplevels(ddply(inputData, .(SubjectID, SessionID), mutate, TrialID=1:length(VisualField)))
 
@@ -1942,225 +1636,48 @@ ggplot(data=thAndBiases, aes(x=MeanRT, y=th75)) +
 }
 
 
+#' Get threshold and slope from glmData
+#'
+#' Works better with subjects' real data rather than simulated trials
+#' For simulated trials, better to use function called ThAndSlopeForSimData
+#' @export
+ThAndSlope <- function(inputData,           # Data of type glmData
+                       returnMeans=TRUE,    # If FALSE, returns per session data
+                       whichConditions=1)   # condition or conditions to process
+{
+  # Select only bias weights
+  ## Plot proportion correct of responding right to stimuli presented either to left or to right
+  pcRight <- droplevels(subset(inputData, Condition %in% whichConditions))
+  #pcRight <- droplevels(subset(inputData, Condition %in% conditionsToPlot))
+  ## Label left responses to right gratings with negative contrast. Right responses to right gratings will remain with positive sign
+  pcRight[pcRight$VisualField == 1,]$Contrast <- pcRight[pcRight$VisualField == 1,]$Contrast * -1
+  ## Summary of responses to gratings presented in the right
+  pcRightSummary <- ddply(pcRight, .(SubjectID, SessionID, Condition, VisualField, Contrast), summarise,
+                          nRightResp = sum(Response == 2),
+                          nLeftResp = sum(Response == 1),
+                          nRStim = sum(VisualField == 2),
+                          nLStim = sum(VisualField == 1))
+  pcRightSummary <- ddply(pcRightSummary, .(SubjectID, SessionID, Condition, VisualField, Contrast), summarise,
+                          pRightCorrect = nRightResp / (nRStim + nLStim),
+                          nYesR=nRightResp,
+                          nNoR=nLeftResp)
+  ## Convert contrast into %
+  pcRightSummary$Contrast <- pcRightSummary$Contrast * 100
+  print("Fitting Probit function to data")
+  models <- dlply(pcRightSummary, c("SubjectID", "SessionID", "Condition"), .fun=chb:::FitProbit)
+  predvals <- ldply(models, .fun=PredictvalsProbit, xvar="Contrast", yvar="pRightCorrect", type="response")
 
-########################## --- PrepareTrials --- #############################
-## Function that generates empty trials for a given contrast
-PrepareTrials <- function(contrast, subjectID="ERR", Condition=-1) {
-  #PrepareTrials <- function(contrast, subjectID="XXXX", sessionID=T, visualField=T, drift=T, response=T, CorrIncorr=T) {
-  numReps <- 4
-  trials <- data.frame(SubjectID=subjectID, SessionID=as.factor(1), Contrast=contrast, VisualField=as.numeric(1), Drift=as.numeric(1), Response=NaN, RT=NaN, CorrIncorr=NaN,  y=NaN, Condition=as.integer(1))
-  trials <- trials[rep(1:nrow(trials), numReps),]
-  trials$Drift[c(2, 4)] <- 2
-  trials$VisualField[3:4] <- 2
-  trials$Condition <- Condition
-  return(trials)
-}
-
-########################### --- SimulateSubjectResponses ---##################################
-## Run simulations with and without history weights
-## We will get the shape of the psychometric function for both of these conditions
-## and compute the slope from these curves to compare "No bias" condition with "biased" condition
-# Number of times one contrast intensity should be presented (this will be divided by 4 to accomodate left/right presentations and left/right drifts of stimulus)
-SimulateSubjectResponses <- function(subjectWeights,           # Weights of the model for each subject. Only regularized weights will be selected.
-                                     failWeightsToSimulate,    # Failure weights for which simulations will be computed
-                                     B=1000,                   # Number of simulated trials (min should be 4 and preferably divisible by 4)
-                                     setLRBiasToZero=T,        # Set Left/Right subject bias to 0. Alternatively, L/R bias will remain
-                                     setSuccessBiasToZero=T,    # Set success bias to 0. Alternatively, subject's native success bias will be used.
-                                     conditionsToSimulate      # Experimental conditions that will be used for simulation
-) {
-  ############## THIS SIMLULATION NEEDS TO BE OPTIMISED
-  ### HAve a look at Dani's code: http://is.gd/RMdsM1
-  ### He has a part there that uses simulation
-  ### Also, he estimates confidence intervals using simulations
-  if (missing(failWeightsToSimulate)) stop("Please specify failWeightsToSimulate")
-  # Select conditions
-  if (!missing(conditionsToSimulate)) subjectWeights <- subset(subjectWeights, Condition %in% conditionsToSimulate)
-  # Ensure only regularized weights are selected
-  regularizedWeights <- droplevels(subset(subjectWeights, Regularized=="yes"))
-
-  # Compute mean subject weights for each condition
-  meanSbjWeights <- ddply(regularizedWeights, .(SubjectID, Condition, Parameter), summarise,
-                          MeanWeight=mean(Weight),
-                          std=sd(Weight, na.rm=TRUE),
-                          n=sum(!is.na(Weight)),
-                          se=std/sqrt(n))
-  meanSbjWeights <- droplevels(meanSbjWeights)
-  #browser()
-  ## Setup simulations to calculate the change of psychometric curve slope depending
-  ## on change of error bias (PrevFail)
-  if (B<4) {
-    B <- 4
+  # Return either means or per session th and slope
+  if (returnMeans) {
+    meanPredvals <- ddply(predvals, .(SubjectID, Condition),
+                          summarise, slope=mean(slope),
+                          th75=mean(Th75), th50=mean(Th50))
   } else {
-    print(paste("Requested number of simulation trials per contrast:", B))
-    print(paste("Actual number of simulation trials per contrast:", as.integer(B/4)*4))
+    return(ddply(predvals, .(SubjectID, Condition, SessionID),
+                 summarise, slope=mean(slope),
+                 th75=mean(Th75), th50=mean(Th50)))
   }
 
-  ## Set intercept and prevSuccess weights to 0
-  if (setLRBiasToZero) meanSbjWeights[meanSbjWeights$Parameter=="(Intercept)",]$MeanWeight <- 0
-  if (setSuccessBiasToZero) meanSbjWeights[meanSbjWeights$Parameter=="PrevCorr1",]$MeanWeight <- 0
-
-  ## Storage for simulation results
-  slopeSimData <- data.frame()
-  ## Loop through each "PrevFail" weights
-  for (ixSubject in levels(droplevels(meanSbjWeights$SubjectID))) {
-    oneSbjConditions <- unique(meanSbjWeights$Condition[meanSbjWeights$SubjectID==ixSubject])
-    for (ixCondition in oneSbjConditions) {
-      subjectModel <- subset(meanSbjWeights, SubjectID==ixSubject & Condition==ixCondition)
-      #browser()
-      prevFailValues <- data.frame(Weight=failWeightsToSimulate, IsSubject=FALSE)
-      prevFailValues <- rbind(prevFailValues, data.frame(Weight =subjectModel$MeanWeight[subjectModel$Parameter=="PrevFail1"], IsSubject=TRUE))
-      for (ixWeight in 1:nrow(prevFailValues)) {
-        #browser()
-        newModel <- subjectModel
-        newModel$MeanWeight[newModel$Parameter=="PrevFail1"] <- prevFailValues$Weight[ixWeight]
-        ## Get contrast levels
-        ixContrasts <- grep("c0", newModel$Parameter)
-        contrastLevelsAsChar <- as.character(newModel$Parameter[ixContrasts])
-        contrastLevelsAsNum <- sort(as.numeric(substring(contrastLevelsAsChar, 2)))
-        ## Add new column with contrast levels
-        #browser()
-        simulationTrials <- do.call(rbind, lapply(contrastLevelsAsNum, PrepareTrials, subjectID=ixSubject, Condition=ixCondition))
-        simulationTrials <- simulationTrials[rep(1:nrow(simulationTrials), B/4), ] # B/4 because left and right sides are already in simulationTrials as well as left and right drifts
-        ## Randomly shuffle trials
-        simulationTrials <- simulationTrials[sample(nrow(simulationTrials)), ]
-        simTrialsForGlm <- BuilDataForGLM(simulationTrials, nHistoryBack=nBack, successColName=successColName, failColName=failColName)
-        simTrialsForGlm <- droplevels(simTrialsForGlm)
-        ## Add "Intercept" column
-        simTrialsForGlm$"(Intercept)" <- 1
-        ## Calculate the response to the first trial cause it doesn't have history term
-        logOdds <- sum(simTrialsForGlm[1, as.character(newModel$Parameter)] * newModel$MeanWeight)
-        p <- 1 / (1 + 1/exp(logOdds))
-        simTrialsForGlm[1,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-        simTrialsForGlm[1,]$CorrIncorr <- ifelse(simTrialsForGlm[1,]$VisualField==simTrialsForGlm[1,]$Response, 1, 0)
-        simTrialsForGlm[1,]$y <- ifelse(simTrialsForGlm[1,]$Response==1, -1, 1)
-        ## For each trial, get model responses
-        for (ixTrial in 2:nrow(simTrialsForGlm)) {
-          # If previous trial was failure
-          if (simTrialsForGlm[ixTrial-1,]$CorrIncorr==0) {
-            simTrialsForGlm[ixTrial,]$PrevFail1 <- ifelse(simTrialsForGlm[ixTrial-1,]$Response==1, -1, 1)
-          } else {
-            simTrialsForGlm[ixTrial,]$PrevCorr1 <- ifelse(simTrialsForGlm[ixTrial-1,]$Response==1, -1, 1)
-          }
-          currentTrial <- simTrialsForGlm[ixTrial, as.character(newModel$Parameter)]
-          #print(currentTrial)
-          logOdds <- sum(currentTrial * newModel$MeanWeight)
-          ## Back transform logOdds into probability
-          p <- 1 / (1 + 1/exp(logOdds))
-          #browser()
-          ## Toss a coin with that probability to identify left or right response to the stimulus
-          simTrialsForGlm[ixTrial,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-          #simTrialsForGlm[ixTrial,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-          simTrialsForGlm[ixTrial,]$CorrIncorr <- ifelse(simTrialsForGlm[ixTrial,]$VisualField==simTrialsForGlm[ixTrial,]$Response, 1, 0)
-          simTrialsForGlm[ixTrial,]$y <- ifelse(simTrialsForGlm[ixTrial,]$Response==1, -1, 1)
-        }
-        slopeSimData <- rbind.fill(slopeSimData, cbind(simTrialsForGlm, PrevFailWeight=prevFailValues$Weight[ixWeight], IsSubject=prevFailValues$IsSubject[ixWeight]))
-        print(paste(ixSubject, ', prevFailWeight=', as.character(prevFailValues$Weight[ixWeight]), ' Condition=', ixCondition, sep=''))
-      }
-    }
-  }
-  return(slopeSimData)
-}
-
-
-########################### --- SimulateOneSubject ---##################################
-# Simulate one subject using contrast weights, L/R bias and history weights
-# The simulation is computed ONLY ONCE using certain number of trials specified by
-# trialsPerContrast
-SimulateOneSubject <- function(subjectWeights,           # This should include Intercept, history bias weights and contrast weights
-                               SubjectID="temp",         # Subject ID
-                               Condition= -777,          # Condition
-                               trialsPerContrast=100,    # # Number of trials per contrast
-                               nBack=nBack)              # History depth
-{
-  sbjModel <- subjectWeights
-  ## Get contrast levels
-  ixContrasts <- grep("c0", sbjModel$Parameter)
-  contrastLevelsAsChar <- as.character(sbjModel$Parameter[ixContrasts])
-  contrastLevelsAsNum <- sort(as.numeric(substring(contrastLevelsAsChar, 2)))
-  ## Add new column with contrast levels
-  simulationTrials <- do.call(rbind, lapply(contrastLevelsAsNum, PrepareTrials, subjectID=SubjectID, Condition=Condition))
-  simulationTrials <- simulationTrials[rep(1:nrow(simulationTrials), trialsPerContrast/4), ] # divided by 4 because left and right sides are already in simulationTrials as well as left and right drifts
-  ## Randomly shuffle trials
-  simulationTrials <- simulationTrials[sample(nrow(simulationTrials)), ]
-  simTrialsForGlm <- BuilDataForGLM(simulationTrials, nBack, successColName=successColName, failColName=failColName)
-  simTrialsForGlm <- droplevels(simTrialsForGlm)
-  ## Add "Intercept" column
-  simTrialsForGlm$"(Intercept)" <- 1
-  ## Calculate the response to the first trial cause it doesn't have history term
-  logOdds <- sum(simTrialsForGlm[1, as.character(sbjModel$Parameter)] * sbjModel$Weight)
-  p <- 1 / (1 + 1/exp(logOdds))
-  simTrialsForGlm[1,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-  simTrialsForGlm[1,]$CorrIncorr <- ifelse(simTrialsForGlm[1,]$VisualField==simTrialsForGlm[1,]$Response, 1, 0)
-  simTrialsForGlm[1,]$y <- ifelse(simTrialsForGlm[1,]$Response==1, -1, 1)
-  ## For each trial, get model responses
-  for (ixTrial in 2:nrow(simTrialsForGlm)) {
-    # If previous trial was failure
-    if (simTrialsForGlm[ixTrial-1,]$CorrIncorr==0) {
-      simTrialsForGlm[ixTrial,]$PrevFail1 <- simTrialsForGlm[ixTrial-1,]$y
-    } else {
-      simTrialsForGlm[ixTrial,]$PrevCorr1 <- simTrialsForGlm[ixTrial-1,]$y
-    }
-    currentTrial <- simTrialsForGlm[ixTrial, as.character(sbjModel$Parameter)]
-    logOdds <- sum(currentTrial * sbjModel$Weight)
-    ## Back transform logOdds into probability
-    p <- 1 / (1 + 1/exp(logOdds))
-    ## Toss a coin with that probability to identify left or right response to the stimulus
-    simTrialsForGlm[ixTrial,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-    #simTrialsForGlm[ixTrial,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-    simTrialsForGlm[ixTrial,]$CorrIncorr <- ifelse(simTrialsForGlm[ixTrial,]$VisualField==simTrialsForGlm[ixTrial,]$Response, 1, 0)
-    simTrialsForGlm[ixTrial,]$y <- ifelse(simTrialsForGlm[ixTrial,]$Response==1, -1, 1)
-    #print(ixTrial)
-  }
-  return(simTrialsForGlm)
-  # Data frame to store the results
-  #simulatedData <- rbind.fill(simulatedData, cbind(simTrialsForGlm, PrevFailWeight=prevFailValues$Weight[ixWeight], IsSubject=prevFailValues$IsSubject[ixWeight]))
-  #print(paste(ixSubject, ', prevFailWeight=', as.character(prevFailValues$Weight[ixWeight]), ' Condition=', ixCondition, sep=''))
-}
-
-
-########################### --- SimulateResponses ---##################################
-# Simulate responses for a
-SimulateResponses <- function(subjectWeights,           # Model weights by subject and condition.
-                              nSimulations=10,
-                              trialsPerContrast=50,
-                              Conditions)              # Conditions to simulate
-{
-
-  if (!missing(Conditions)) subjectWeights <- droplevels(subset(subjectWeights, Condition %in% Conditions))
-  if (nrow(subjectWeights)==0) {
-    cat("(SimulateResponses) subjectWeights in empty")
-    return()
-  }
-  subjectWeights <- droplevels(subjectWeights)
-  # Simple check to ensure non-regularized weights are excluded
-  if ("Regularized" %in% colnames(subjectWeights))
-    if (length(unique(subjectWeights$Regularized))>1) {
-      print("Might have found non-regularized weights. They will be excluded.")
-      subjectWeights <- droplevels(subset(subjectWeights, Regularized=="yes"))
-    }
-  # Progress bar indicator
-  nSubjects <- length(levels(subjectWeights$SubjectID))
-  if (nSubjects==1) nSubjects = 2
-  progBar <- txtProgressBar(style=3, min=1, max=nSubjects, label="simulating")
-  # Data storage
-  simData <- data.frame()
-  # Compute simulations
-  for (ixSubject in levels(subjectWeights$SubjectID)) {
-    sbjConditions <- unique(subjectWeights$Condition[subjectWeights$SubjectID==ixSubject])
-    for (ixCondition in sbjConditions) {
-      subjectModel <- subset(subjectWeights, SubjectID==ixSubject & Condition==ixCondition)
-      for (ixSimulation in 1:nSimulations) {
-        tmpData <- SimulateOneSubject(subjectModel, SubjectID=ixSubject, Condition=ixCondition, trialsPerContrast=trialsPerContrast)
-        tmpData$SessionID <- ixSimulation
-        simData <- rbind.fill(simData, tmpData)
-        #print(paste(ixSubject, ', Condition=', ixCondition, sep=''))
-      }
-    }
-    setTxtProgressBar(progBar, which(levels(subjectWeights$SubjectID)==ixSubject))
-  }
-  close(progBar)
-  simData$SessionID <- as.factor(simData$SessionID)
-  return(simData)
 }
 
 

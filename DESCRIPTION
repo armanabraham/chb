@@ -3,8 +3,14 @@ Version: 0.1
 Date: 3/07/2015
 Title: Choice history biases
 Description: Analyse choice history biases for psychophysical data
-Author: Arman Abrahamyan <arman@stanford.edu>
-Maintainer: Arman Abrahamyan <arman@stanford.edu>
+Author: Arman Abrahamyan <armana@stanford.edu>
+Maintainer: Arman Abrahamyan <armana@stanford.edu>
 License: GPL
-Imports: glmnet, ggplot2, ggthemes, Hmisc
+Imports:
+    aapack,
+    glmnet,
+    ggplot2,
+    ggthemes,
+    Hmisc
 LazyData: TRUE
+RoxygenNote: 5.0.0
