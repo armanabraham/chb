@@ -56,8 +56,6 @@ SimulateNoBiasVsSubjectBias <- function(sbjWeights,               # Regularized 
   return(thsAndSlopes)
 }
 
-
-
 #' Simulate subject responses for different set of failure weights
 #'
 #' Also controls setting L/R bias and success bias to 0
@@ -66,15 +64,17 @@ SimulateNoBiasVsSubjectBias <- function(sbjWeights,               # Regularized 
 #' biases remain either constant or absent (same for L/R bias)
 #' @export
 SimulateSubjectResponses <- function(subjectWeights,           # Weights of the model for each subject. Only regularized weights will be selected.
-                                     failWeightsToSim,         # Failure weights for which simulations will be computed
-                                     successWeightsToSim,      # Success weights to simulate
-                                     nTrialsPerContrast=1000,                   # Number of trials one contrast intensity should be simulates (min should be 4 and preferably divisible by 4)
+                                     failWeightsToSim=NA,        # Failure weights for which simulations will be computed. If set to NA, only subject weights will be used for simulation
+                                     successWeightsToSim=NA,    # Success weights to simulate. If set to NA, only subject weights will be used for simulation
+                                     nTrialsPerContrast=1000,   # Number of trials one contrast intensity should be simulates (min should be 4 and preferably divisible by 4)
                                      setLRBiasToZero=TRUE,     # Set Left/Right subject bias to 0. Alternatively, subject's L/R bias will used
-                                     conditionsToSimulate)     # Experimental conditions that will be used for simulation
+                                     conditionsToSimulate,      # Experimental conditions that will be used for simulation
+                                     lapseRate=0)              # Lapse rate between 0 and 1. If 0, not used. Otherwise, the response will be randomly generated with that probability
 {
-
-  if (missing(failWeightsToSim)) stop("Please specify failWeightsToSim")
-  if (missing(successWeightsToSim)) stop("Please specify successWeightsToSim")
+  if (failWeightsToSim==NA | successWeightsToSim==NA) {
+    failWeightsToSim <- NA
+    successWeightsToSim <- NA
+  }
 
   # Select conditions
   if (!missing(conditionsToSimulate)) subjectWeights <- subset(subjectWeights, Condition %in% conditionsToSimulate)
@@ -83,7 +83,7 @@ SimulateSubjectResponses <- function(subjectWeights,           # Weights of the 
 
   # Compute mean subject weights for each condition
   meanSbjWeights <- ddply(regularizedWeights, .(SubjectID, Condition, Parameter), summarise,
-                          MeanWeight=mean(Weight),
+                          Weight=mean(Weight),
                           std=sd(Weight, na.rm=TRUE),
                           n=sum(!is.na(Weight)),
                           se=std/sqrt(n))
@@ -93,7 +93,7 @@ SimulateSubjectResponses <- function(subjectWeights,           # Weights of the 
   print(paste('Requested', nTrialsPerContrast, 'trials, adjusted to ', as.integer(nTrialsPerContrast/4)*4))
 
   # Set L/R bias (intercept) to 0, if requested
-  if (setLRBiasToZero) meanSbjWeights[meanSbjWeights$Parameter=="(Intercept)",]$MeanWeight <- 0
+  if (setLRBiasToZero) meanSbjWeights[meanSbjWeights$Parameter=="(Intercept)",]$Weight <- 0
 
   simData <- data.frame() # data frame to store simulation results
   ## Loop through each "PrevFail" weights
@@ -102,68 +102,27 @@ SimulateSubjectResponses <- function(subjectWeights,           # Weights of the 
     oneSbjConditions <- unique(meanSbjWeights$Condition[meanSbjWeights$SubjectID==ixSubject])
     for (ixCondition in oneSbjConditions) {
       subjectModel <- subset(meanSbjWeights, SubjectID==ixSubject & Condition==ixCondition)
-      #browser()
       historyWeights <- expand.grid(failWeight=failWeightsToSim, successWeight=successWeightsToSim, IsSubject=FALSE)
-      sbjFailWeight <- with(subjectModel, MeanWeight[Parameter=='PrevFail1'])
-      sbjSuccessWeight <- with(subjectModel, MeanWeight[Parameter=='PrevCorr1'])
+      sbjFailWeight <- with(subjectModel, Weight[Parameter=='PrevFail1'])
+      sbjSuccessWeight <- with(subjectModel, Weight[Parameter=='PrevCorr1'])
 
       historyWeights <- rbind(historyWeights,
                               data.frame(failWeight=sbjFailWeight, successWeight=sbjSuccessWeight, IsSubject=TRUE))
       for (ixWeight in 1:nrow(historyWeights)) {
-        #browser()
         newModel <- subjectModel
-        newModel$MeanWeight[newModel$Parameter=="PrevFail1"] <- historyWeights$failWeight[ixWeight]
-        newModel$MeanWeight[newModel$Parameter=="PrevCorr1"] <- historyWeights$successWeight[ixWeight]
-        ## Get contrast levels
-        ixContrasts <- grep("c0", newModel$Parameter)
-        contrastLevelsAsChar <- as.character(newModel$Parameter[ixContrasts])
-        contrastLevelsAsNum <- sort(as.numeric(substring(contrastLevelsAsChar, 2)))
-        ## Add new column with contrast levels
+        newModel$Weight[newModel$Parameter=="PrevFail1"] <- historyWeights$failWeight[ixWeight]
+        newModel$Weight[newModel$Parameter=="PrevCorr1"] <- historyWeights$successWeight[ixWeight]
         #browser()
-        simulationTrials <- do.call(rbind, lapply(contrastLevelsAsNum, PrepareTrials, subjectID=ixSubject, Condition=ixCondition))
-        simulationTrials <- simulationTrials[rep(1:nrow(simulationTrials), nTrialsPerContrast/4), ] # nTrialsPerContrast/4 because left and right sides are already in simulationTrials as well as left and right drifts
-        ## Randomly shuffle trials
-        simulationTrials <- simulationTrials[sample(nrow(simulationTrials)), ]
-        simTrialsForGlm <- BuilDataForGLM(simulationTrials, nHistoryBack=nBack, successColName=successColName, failColName=failColName)
-        simTrialsForGlm <- droplevels(simTrialsForGlm)
-        ## Add "Intercept" column
-        simTrialsForGlm$"(Intercept)" <- 1
-        ## Calculate the response to the first trial cause it doesn't have history term
-        logOdds <- sum(simTrialsForGlm[1, as.character(newModel$Parameter)] * newModel$MeanWeight)
-        p <- 1 / (1 + 1/exp(logOdds))
-        simTrialsForGlm[1,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-        simTrialsForGlm[1,]$CorrIncorr <- ifelse(simTrialsForGlm[1,]$VisualField==simTrialsForGlm[1,]$Response, 1, 0)
-        simTrialsForGlm[1,]$y <- ifelse(simTrialsForGlm[1,]$Response==1, -1, 1)
-        ## For each trial, get model responses
-        for (ixTrial in 2:nrow(simTrialsForGlm)) {
-          # If previous trial was failure
-          if (simTrialsForGlm[ixTrial-1,]$CorrIncorr==0) {
-            simTrialsForGlm[ixTrial,]$PrevFail1 <- ifelse(simTrialsForGlm[ixTrial-1,]$Response==1, -1, 1)
-          } else {
-            simTrialsForGlm[ixTrial,]$PrevCorr1 <- ifelse(simTrialsForGlm[ixTrial-1,]$Response==1, -1, 1)
-          }
-          currentTrial <- simTrialsForGlm[ixTrial, as.character(newModel$Parameter)]
-          #print(currentTrial)
-          logOdds <- sum(currentTrial * newModel$MeanWeight)
-          ## Back transform logOdds into probability
-          p <- 1 / (1 + 1/exp(logOdds))
-          #browser()
-          ## Toss a coin with that probability to identify left or right response to the stimulus
-          simTrialsForGlm[ixTrial,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-          #simTrialsForGlm[ixTrial,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
-          simTrialsForGlm[ixTrial,]$CorrIncorr <- ifelse(simTrialsForGlm[ixTrial,]$VisualField==simTrialsForGlm[ixTrial,]$Response, 1, 0)
-          simTrialsForGlm[ixTrial,]$y <- ifelse(simTrialsForGlm[ixTrial,]$Response==1, -1, 1)
-        }
+        simTrialsForGlm <- SimulateOneSubject(newModel, SubjectID = unique(newModel$SubjectID),
+                                              Condition = unique(newModel$Condition), trialsPerContrast = nTrialsPerContrast,
+                                              nBack=1, lapseRate=lapseRate)
         simData <- rbind.fill(simData, cbind(simTrialsForGlm,
                                              FailWeight=historyWeights$failWeight[ixWeight],
                                              SuccessWeight=historyWeights$successWeight[ixWeight],
                                              IsSubject=historyWeights$IsSubject[ixWeight]))
-        print(paste(ixSubject, ', failWeight=',
-                    as.character(historyWeights$failWeight[ixWeight]),
-                    ', successWeight=',
-                    historyWeights$successWeight[ixWeight],
+        print(paste(ixSubject, ', failWeight=', as.character(historyWeights$failWeight[ixWeight]),
+                    ', successWeight=', historyWeights$successWeight[ixWeight],
                     ', Condition=', ixCondition, sep=''))
-        #browser()
       }
     }
   }
@@ -187,11 +146,12 @@ SimulateSubjectResponses <- function(subjectWeights,           # Weights of the 
 #' @examples
 #' SimulateOneSubject(oneSbjWeights, nTrialsPerContrast=50)
 #' @export
-SimulateOneSubject <- function(subjectWeights,           # This should include Intercept, history bias weights and contrast weights
-                               SubjectID="temp",         # Subject ID
-                               Condition= -777,          # Condition
-                               trialsPerContrast=100,    # Number of trials per contrast
-                               nBack=nBack)              # History depth
+SimulateOneSubject<- function(subjectWeights,           # This should include Intercept, history bias weights and contrast weights
+                              SubjectID="temp",         # Subject ID
+                              Condition= -777,          # Condition
+                              trialsPerContrast=100,    # Number of trials per contrast
+                              nBack=nBack,              # History depth
+                              lapseRate=0)              # Lapse rate between 0 and 1. If 0, not used. Otherwise, the response will be randomly generated with that probability
 {
   sbjModel <- subjectWeights
   ## Get contrast levels
@@ -199,20 +159,33 @@ SimulateOneSubject <- function(subjectWeights,           # This should include I
   contrastLevelsAsChar <- as.character(sbjModel$Parameter[ixContrasts])
   contrastLevelsAsNum <- sort(as.numeric(substring(contrastLevelsAsChar, 2)))
   ## Add new column with contrast levels
-  simulationTrials <- do.call(rbind, lapply(contrastLevelsAsNum, PrepareTrials, subjectID=SubjectID, Condition=Condition))
+  simulationTrials <- do.call(rbind, lapply(contrastLevelsAsNum, chb:::PrepareTrials, subjectID=SubjectID, Condition=Condition))
   simulationTrials <- simulationTrials[rep(1:nrow(simulationTrials), trialsPerContrast/4), ] # divided by 4 because left and right sides are already in simulationTrials as well as left and right drifts
   ## Randomly shuffle trials
   simulationTrials <- simulationTrials[sample(nrow(simulationTrials)), ]
-  simTrialsForGlm <- BuilDataForGLM(simulationTrials, nBack, successColName=successColName, failColName=failColName)
+  simTrialsForGlm <- BuilDataForGLM(simulationTrials, nBack, successColName=chb:::successColName, failColName=chb:::failColName)
   simTrialsForGlm <- droplevels(simTrialsForGlm)
   ## Add "Intercept" column
   simTrialsForGlm$"(Intercept)" <- 1
+  nLapses <- 0 # A counter of number of lapses if lapseRate > 0
+
   ## Calculate the response to the first trial cause it doesn't have history term
   logOdds <- sum(simTrialsForGlm[1, as.character(sbjModel$Parameter)] * sbjModel$Weight)
   p <- 1 / (1 + 1/exp(logOdds))
+  # If lapse rate > 0 is provided
+  if (lapseRate > 0) {
+    # If "lapse" takes place, then probability of response
+    # will be set to random, that is 0.5
+    if (runif(1) <= lapseRate) {
+      p <- 0.5
+      nLapses <- nLapses + 1
+    }
+  }
+
   simTrialsForGlm[1,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
   simTrialsForGlm[1,]$CorrIncorr <- ifelse(simTrialsForGlm[1,]$VisualField==simTrialsForGlm[1,]$Response, 1, 0)
   simTrialsForGlm[1,]$y <- ifelse(simTrialsForGlm[1,]$Response==1, -1, 1)
+
   ## For each trial, get model responses
   for (ixTrial in 2:nrow(simTrialsForGlm)) {
     # If previous trial was failure
@@ -225,75 +198,27 @@ SimulateOneSubject <- function(subjectWeights,           # This should include I
     logOdds <- sum(currentTrial * sbjModel$Weight)
     ## Back transform logOdds into probability
     p <- 1 / (1 + 1/exp(logOdds))
+    #browser()
+    # If lapse rate > 0 is provided
+    if (lapseRate > 0) {
+      # If "lapse" takes place, then probability of response
+      # will be set to random, that is 0.5
+      if (runif(1) <= lapseRate) {
+        p <- 0.5
+        nLapses <- nLapses + 1
+      }
+    }
     ## Toss a coin with that probability to identify left or right response to the stimulus
     simTrialsForGlm[ixTrial,]$Response <- c(1,2)[rbinom(1, size=1, prob=p)+1]
+    # Fill out the helper parameters based on response
     simTrialsForGlm[ixTrial,]$CorrIncorr <- ifelse(simTrialsForGlm[ixTrial,]$VisualField==simTrialsForGlm[ixTrial,]$Response, 1, 0)
     simTrialsForGlm[ixTrial,]$y <- ifelse(simTrialsForGlm[ixTrial,]$Response==1, -1, 1)
   }
   simTrialsForGlm$Condition <- as.factor(simTrialsForGlm$Condition)
+  print(paste('nLapses=', nLapses))
   return(simTrialsForGlm)
-  # Data frame to store the results
-  #simulatedData <- rbind.fill(simulatedData, cbind(simTrialsForGlm, PrevFailWeight=prevFailValues$Weight[ixWeight], IsSubject=prevFailValues$IsSubject[ixWeight]))
-  #print(paste(ixSubject, ', prevFailWeight=', as.character(prevFailValues$Weight[ixWeight]), ' Condition=', ixCondition, sep=''))
 }
 
-
-#' Simulate responses using given model weights
-#'
-#' Compared to SimulateSubjectResponses, this function is simpler
-#' because it only deals with given set of weights and does not
-#' allow running different model parameters. This function
-#' can actually be called from within SimulateSubjectResponses
-#' but for some reason it is not done. A TODO for future.
-#'
-#' @param subjectWeights
-#' @param nSimulations
-#' @param trialsPerContrast
-#' @param Conditions
-#'
-#' @export
-SimulateResponses <- function(subjectWeights,           # Model weights by subject and condition.
-                              nSimulations=10,
-                              trialsPerContrast=50,
-                              Conditions)              # Conditions to simulate
-{
-
-  if (!missing(Conditions)) subjectWeights <- droplevels(subset(subjectWeights, Condition %in% Conditions))
-  if (nrow(subjectWeights)==0) {
-    cat("(SimulateResponses) subjectWeights in empty")
-    return()
-  }
-  subjectWeights <- droplevels(subjectWeights)
-  # Simple check to ensure non-regularized weights are excluded
-  if ("Regularized" %in% colnames(subjectWeights))
-    if (length(unique(subjectWeights$Regularized))>1) {
-      print("Might have found non-regularized weights. They will be excluded.")
-      subjectWeights <- droplevels(subset(subjectWeights, Regularized=="yes"))
-    }
-  # Progress bar indicator
-  nSubjects <- length(levels(subjectWeights$SubjectID))
-  if (nSubjects==1) nSubjects = 2
-  progBar <- txtProgressBar(style=3, min=1, max=nSubjects, label="simulating")
-  # Data storage
-  simData <- data.frame()
-  # Compute simulations
-  for (ixSubject in levels(subjectWeights$SubjectID)) {
-    sbjConditions <- unique(subjectWeights$Condition[subjectWeights$SubjectID==ixSubject])
-    for (ixCondition in sbjConditions) {
-      subjectModel <- subset(subjectWeights, SubjectID==ixSubject & Condition==ixCondition)
-      for (ixSimulation in 1:nSimulations) {
-        tmpData <- SimulateOneSubject(subjectModel, SubjectID=ixSubject, Condition=ixCondition, trialsPerContrast=trialsPerContrast)
-        tmpData$SessionID <- ixSimulation
-        simData <- rbind.fill(simData, tmpData)
-        #print(paste(ixSubject, ', Condition=', ixCondition, sep=''))
-      }
-    }
-    setTxtProgressBar(progBar, which(levels(subjectWeights$SubjectID)==ixSubject))
-  }
-  close(progBar)
-  simData$SessionID <- as.factor(simData$SessionID)
-  return(simData)
-}
 
 #' Compute threshold and slope from simulated trials
 #'
@@ -414,4 +339,61 @@ SensitivtyDeclineMatrix <- function(regWeights,
   return(allThsAndSlopes)
 }
 
+
+
+#' Simulate responses using given model weights
+#'
+#' BETTER NOT TO USE THIS. Instead, use SimulateSubjectResponses
+#' Compared to SimulateSubjectResponses, this function is simpler
+#' because it only deals with given set of weights and does not
+#' allow running different model parameters. This function
+#' can actually be called from within SimulateSubjectResponses
+#' but for some reason it is not done. A TODO for future.
+#'
+#' @param subjectWeights
+#' @param nSimulations
+#' @param trialsPerContrast
+#' @param Conditions
+#'
+SimulateResponses <- function(subjectWeights,           # Model weights by subject and condition.
+                              nSimulations=10,
+                              trialsPerContrast=50,
+                              Conditions)              # Conditions to simulate
+{
+  if (!missing(Conditions)) subjectWeights <- droplevels(subset(subjectWeights, Condition %in% Conditions))
+  if (nrow(subjectWeights)==0) {
+    cat("(SimulateResponses) subjectWeights in empty")
+    return()
+  }
+  subjectWeights <- droplevels(subjectWeights)
+  # Simple check to ensure non-regularized weights are excluded
+  if ("Regularized" %in% colnames(subjectWeights))
+    if (length(unique(subjectWeights$Regularized))>1) {
+      print("Might have found non-regularized weights. They will be excluded.")
+      subjectWeights <- droplevels(subset(subjectWeights, Regularized=="yes"))
+    }
+  # Progress bar indicator
+  nSubjects <- length(levels(subjectWeights$SubjectID))
+  if (nSubjects==1) nSubjects = 2
+  progBar <- txtProgressBar(style=3, min=1, max=nSubjects, label="simulating")
+  # Data storage
+  simData <- data.frame()
+  # Compute simulations
+  for (ixSubject in levels(subjectWeights$SubjectID)) {
+    sbjConditions <- unique(subjectWeights$Condition[subjectWeights$SubjectID==ixSubject])
+    for (ixCondition in sbjConditions) {
+      subjectModel <- subset(subjectWeights, SubjectID==ixSubject & Condition==ixCondition)
+      for (ixSimulation in 1:nSimulations) {
+        tmpData <- SimulateOneSubject(subjectModel, SubjectID=ixSubject, Condition=ixCondition, trialsPerContrast=trialsPerContrast)
+        tmpData$SessionID <- ixSimulation
+        simData <- rbind.fill(simData, tmpData)
+        #print(paste(ixSubject, ', Condition=', ixCondition, sep=''))
+      }
+    }
+    setTxtProgressBar(progBar, which(levels(subjectWeights$SubjectID)==ixSubject))
+  }
+  close(progBar)
+  simData$SessionID <- as.factor(simData$SessionID)
+  return(simData)
+}
 
