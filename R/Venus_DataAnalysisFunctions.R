@@ -27,7 +27,8 @@ prevSuccessColor <- '#2b83ba'
 # prevFailColor <- 'b62813'
 # prevSuccessColor <- 'a7b112'
 
-
+# Set of regularization parameters (lambdas) to test
+lambdas <- c(exp(-8), exp(-7), exp(-6), exp(-5), exp(-4), exp(-3), 0.05, 0.1, 0.15, 0.25, 0.3, 0.5, 0.8, 1, 3, 7, 11, 15, 20)
 
 #' Subject demographics such as age and education
 #'
