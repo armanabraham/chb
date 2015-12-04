@@ -872,7 +872,7 @@ ProbitThreshold <- function(p,        # probability
   th50 <- qnorm(0.5, nhu, sigma)
   # Threshold is contrast increment that will raise the threshold from 50% to p percent
   th <- thP - th50
-  # If p=50% was requested, return 50% threshold as is, without subtract from itself
+  # If p=50% was requested, return 50% threshold as is
   # which will make it 0
   th[p==0.5] <- th50
   return(th)
@@ -965,7 +965,7 @@ DataStatistics <- function(weights,  				# Regularized weights
 							plotByCondition=TRUE,	# Plot by Condition. Otherwise, collapse across Condition
 							plotSubjectMeans		# Compute means across Sessions for each subject and plots those means
 									   ) {
-
+# TODO
 
 
 }
@@ -1637,14 +1637,24 @@ ggplot(data=thAndBiases, aes(x=MeanRT, y=th75)) +
 }
 
 
-#' Get threshold and slope from glmData
+#' Get threshold, slope and lapse rate from glmData
 #'
 #' Works better with subjects' real data rather than simulated trials
-#' For simulated trials, better to use function called ThAndSlopeForSimData
+#' For simulated trials,use ThAndSlopeForSimData
+#'
+#' @param inputData data structured as glmData
+#' @param returnMeans if TRUE, computes average for each subject. Otherwise, returns by-run results
+#' @param whichConditions conditions to analyse. For natural bias, always include conditions 1 and 13
+#'
+#' @return data frame containing threshold, slope and lapse rate of each subject. If requested, can return by-run results, otherwise means of each subject
+#'
+#' @examples
+#' ThSlopeAndLapse(glmData, returnMeans=TRUE, whichCondition=c(1,13))
+#'
 #' @export
-ThAndSlope <- function(inputData,           # Data of type glmData
-                       returnMeans=TRUE,    # If FALSE, returns per session data
-                       whichConditions=1)   # condition or conditions to process
+ThSlopeAndLapse <- function(inputData,                  # Data of type glmData
+                            returnMeans=TRUE,           # When FALSE, returns per-run data, otherwise, averages across runs per subject
+                            whichConditions=c(1,13))    # condition or conditions to process
 {
   # Select only bias weights
   ## Plot proportion correct of responding right to stimuli presented either to left or to right
@@ -1662,86 +1672,54 @@ ThAndSlope <- function(inputData,           # Data of type glmData
                           pRightCorrect = nRightResp / (nRStim + nLStim),
                           nYesR=nRightResp,
                           nNoR=nLeftResp)
+  # Get lapse rate
+  lapses <- ddply(pcRightSummary, .(SubjectID, SessionID, Condition), .fun=LapseRateFromHighestContrast)
   ## Convert contrast into %
   pcRightSummary$Contrast <- pcRightSummary$Contrast * 100
   print("Fitting Probit function to data")
   models <- dlply(pcRightSummary, c("SubjectID", "SessionID", "Condition"), .fun=chb:::FitProbit)
-  predvals <- ldply(models, .fun=PredictvalsProbit, xvar="Contrast", yvar="pRightCorrect", type="response")
+  predvals <- ldply(models, .fun=chb:::PredictvalsProbit, xvar="Contrast", yvar="pRightCorrect", type="response")
 
-  # Return either means or per session th and slope
+  # Return either means, or per run threshold and slope
   if (returnMeans) {
-    meanPredvals <- ddply(predvals, .(SubjectID, Condition),
-                          summarise, slope=mean(slope),
-                          th75=mean(Th75), th50=mean(Th50))
+    cols <- c("SubjectID", "Condition")
   } else {
-    return(ddply(predvals, .(SubjectID, Condition, SessionID),
-                 summarise, slope=mean(slope),
-                 th75=mean(Th75), th50=mean(Th50)))
+    cols <- c("SubjectID", "Condition", "SessionID")
   }
-
+  thAndSlope <- ddply(predvals, cols, summarise, slope=mean(slope), th75=mean(Th75), th50=mean(Th50))
+  lapses <- ddply(lapses, cols, summarise,  LapseRate=mean(LapseRate))
+  # Combine threshold, slope and lapses
+  thSlopeAndLapse <- merge(thAndSlope, lapses)
+  return(thSlopeAndLapse)
 }
 
 
-# ----- FROM DANI ------
-# intensity <- c(1, 2, 3, 4)
-# nCorrect <- c(33, 39, 54, 57)
-# nIncorrect <- c(29, 21, 6, 3)
-# dat <- data.frame(intensity, nCorrect, nIncorrect)
-# dat
-# library("psyphy")
-# intensity <- dat$intensity
-# model <- glm(cbind(dat$nCorrect, dat$nIncorrect) ~ intensity, family = binomial(mafc.probit(2)))
-# library("plyr")
-# pred.p <- predict(model, data.frame(dat$intensity), type = "response")
-# sampling <- function(df) {
-#   n <- length(dat$intensity)
-#   size <- dat$nCorrect + dat$nIncorrect
-#   intensity <- dat$intensity
-#   nCorrect <- rbinom(n, size, prob = pred.p)
-#   nIncorrect <- size - nCorrect
-#   data.frame(intensity, nCorrect, nIncorrect)
-# }
-# fake.dat <- ddply(data.frame(sample = 1:100), .(sample), sampling)
-# head(fake.dat)
-# ------------------------
+#' Compute lapse rate from highest contrast intensity
+#'
+#' Lapses occur due to inattention and are not related to decision making processes
+#' in the brain. Here, the lapse rate is estimated by finding the strongest contrast intensity
+#'  - when missing stimulus is likely to be due to inattention - and computing the error rate
+#'  at that stimulus intensity
+#'
+#' This lapse rate estimation approach is based on common sense, experience and supported by:
+#' Prins, N. (2012). The psychometric function: the lapse rate revisited. Journal of Vision, 12(6). http://doi.org/10.1167/12.6.25
+#'
+#' NOTE: If your data does not strong contrast intensities, using this method of lapse rate estimation is not recommended.
+#' In such a case, it is better to use
+#'
+#' @param rightwardResponses data in the format of proportion of rightward responses (also called pcRightSummary) for one subject. It can either be average across many runs or one run. The function doesn't care about it.
+#'
+#' @return lapse rate as proportion of errors at the highest contrast intensity
+LapseRateFromHighestContrast <- function(rightwardResponses) # proportion rightward responses (also called pcRightSummary in other places)
+{
+  # Find highest contrast intensity
+  maxContrast <- max(abs(rightwardResponses$Contrast))
+  stimOnLeft <- with(rightwardResponses, rightwardResponses[Contrast == -maxContrast,]) # Highest contrast stim presented on the left
+  stimOnRight <- with(rightwardResponses, rightwardResponses[Contrast == maxContrast,]) # Highest contrast stim presented on the right
+  # Lapse rate as average error rate in response to the strongest stimulus
+  lapseRate <- mean(c(stimOnLeft$pRightCorrect, 1-stimOnRight$pRightCorrect))
+  return(data.frame(LapseRate=lapseRate))
+}
 
 
-# ggplot(tophit, aes(x=avg, y=name)) +
-# geom_segment(aes(yend=name), xend=0, colour="grey50") + geom_point(size=3, aes(colour=lg)) + scale_colour_brewer(palette="Set1", limits=c("NL","AL")) +
-# theme_bw() +
-# theme(panel.grid.major.y = element_blank(), # No horizontal grid lines
-# legend.position=c(1, 0.55), # Put legend inside plot area legend.justification=c(1, 0.5))
-# nameorder <- tophit$name[order(tophit$lg, tophit$avg)]
-
-
-
-# ############################################################################
-# ## Function computes confidence interval of history weights
-# ## First, it computes average parameter weights for each subject
-# ## Then, sets history weights to 0 and, using this "nohistory" model,
-# ## generates responses using the original trial sequence from the experiment
-# ## with this "no history" model.
-# HistoryWeightsConfIntervals <- function(glmData, regularizedWeights) {
-# sbjMeanWeights <- ddply(regularizedWeights, .(SubjectID, Parameter, Condition), summarise,
-# 						MeanWeight=mean(Weight),
-# 						std=sd(Weight, na.rm=TRUE),
-# 						n=sum(!is.na(Weight)),
-# 						se=std/sqrt(n))
-# sbjMeanWeightsZeroHistory <- sbjMeanWeights
-# sbjMeanWeightsZeroHistory$MeanWeight[sbjMeanWeightsZeroHistory$Parameter=="PrevCorr1"] <- 0
-# sbjMeanWeightsZeroHistory$MeanWeight[sbjMeanWeightsZeroHistory$Parameter=="PrevFail1"] <- 0
-# ## Compute confidence intervals for history weights
-# for (ixSubject in levels(droplevels(glmData$SubjectID))) {
-# 	oneSubjectData <- subset(glmData, glmData$SubjectID == ixSubject)
-# 	#subjectNumber <- which(ixSubject == levels(droplevels(glmData$SubjectID)))
-# 	for (ixCondition in unique(sbjMeanWeightsZeroHistory$Condition)) {
-# 		for (ixSession in levels(droplevels(oneSubjectData$SessionID))) {
-# 			oneSessionData <- subset(oneSubjectData, (oneSubjectData$SessionID==ixSession) & (oneSubjectData$Condition==ixCondition))
-# 			browser()
-
-# 		}
-# 	}
-# }
-
-# }
 
