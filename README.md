@@ -1,9 +1,9 @@
 ## Synopsis
 
-R package to analyze, model and simulate choice history biases. `chb` stands for choice history biases. 
+`chb`, which stands for Choice History Biases, is an R package to analyze, model and simulate biases in psychophysical data that arise from the outcome of past choices, such as when the subject fails or succeeds on the previous trial.
 
 ## Installation 
-To install the package from GitHub, please install and load devtools package first:
+To install the package from GitHub, please install and load `devtools` package first:
 ```R
 install.packages('devtools')
 library(devtools)
@@ -13,7 +13,7 @@ Install `chb` from repository
 install_github('armanabraham/chb')
 ```
 
-Some function require helper functions located in the package 'aapack'. You can install as follows:
+`chb` may require function from the package `aapack`. To install, run the following: 
 ```R
 install_github('armanabraham/aapack')
 ```
