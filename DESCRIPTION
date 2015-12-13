@@ -2,7 +2,7 @@ Package: chb
 Version: 0.1
 Date: 3/07/2015
 Title: Choice history biases
-Description: Analyse choice history biases for psychophysical data
+Description: Analyze, model and simulate choice history biases
 Author: Arman Abrahamyan <armana@stanford.edu>
 Maintainer: Arman Abrahamyan <armana@stanford.edu>
 License: GPL
