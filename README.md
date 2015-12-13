@@ -13,7 +13,7 @@ Install `chb` from repository
 install_github('armanabraham/chb')
 ```
 
-`chb` may require function from the package `aapack`. To install, run the following: 
+`chb` may require functions from the package `aapack`. To install, run the following: 
 ```R
 install_github('armanabraham/aapack')
 ```
