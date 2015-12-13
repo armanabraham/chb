@@ -1,5 +1,8 @@
+## Synopsis
+
 R package to analyze, model and simulate choice history biases.
 
+## Installation 
 To install the package from GitHub, please install and load devtools package first:
 install.packages('devtools')
 library(devtools)
