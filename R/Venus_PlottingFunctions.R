@@ -535,6 +535,7 @@ HistoryAdaptationScatterplot <- function(weights,  				# Regularized weights
 #'
 #' @param simThAndSlope simulated threshold and slope computed using function NoBiasVsSubjectBias (see example below).
 #' @param whatToPlot either decline of slope or threshold can be plotted
+#' @param whatToReturn return either 'plot' as ggplot object or 'data' prepared for plotting, which can be used for other operations
 #'
 #' @examples
 #' load('20150919_allWeights_RIKEN_UCL_Stanford_cond1n13.RData',verbose=TRUE)
@@ -543,9 +544,9 @@ HistoryAdaptationScatterplot <- function(weights,  				# Regularized weights
 #' thAndSlope <- NoBiasVsSubjectBias(regWeights, nTrialsPerContrast=10, B=5) # B=5 is for fast simulation, for meaningful results use B>500.
 #' PlotSensitivityDecline(thAndSlope) #
 #' @export
-
 PlotSensitivityDecline <- function(simThAndSlope,
-                                   whatToPlot='slope')   # can be either 'slope' or 'threshold'
+                                   whatToPlot='slope', # can be either 'slope' or 'threshold'
+                                   whatToReturn='plot')
 {
   if (whatToPlot == 'slope') colName <- 'slope' else colName <- 'th75'
   # Make subject's (biased) and unbiased sensitivity column into two separate columns
@@ -563,29 +564,33 @@ PlotSensitivityDecline <- function(simThAndSlope,
   sensitivityForPlot <- sensitivity
   # Median sensitivity change for each subject
   sensitivityForPlot <- ddply(sensitivityForPlot, .(SubjectID), summarise,
+                              UnbiasedSensitivity=median(UnbiasedSensitivity),
+                              BiasedSensitivity=median(BiasedSensitivity),
                               MedianChange=median(Change))
-
   # Order subjects by sensitivity change
   orderedSubjects <- with(sensitivityForPlot, SubjectID[order(MedianChange)])
   sensitivityForPlot$SubjectID <- factor(sensitivityForPlot$SubjectID, levels=orderedSubjects)
   sensitivity$SubjectID <- factor(sensitivity$SubjectID, levels=orderedSubjects)
 
-  require(scales)
-  gg <- ggplot(sensitivityForPlot, aes(x=SubjectID, y=MedianChange)) +
-    theme_publish1() +
-    theme(axis.text.y = element_text(size=8)) +
-    xlab('Subject') + ylab('Decline in visual sensitivity (%)') +
-    #geom_hline(yintercept=0, linetype='dashed', color='grey60', size=0.1) +
-    coord_cartesian() +
-    scale_y_continuous(labels=percent) +
-    coord_flip() +
-    geom_blank() +
-    stat_summary(data=sensitivity, aes(x=SubjectID, y=Change, group=SubjectID),
-                 fun.data=median_cl_boot, conf=0.68, geom='errorbar', width=0.0, color = 'grey90') +
-    #geom_line(aes(group='identity'), color='grey90', linetype='dashed') +
-    geom_point(size=2.2, color='grey20')
-  print(gg)
-  return(gg)
+  if (whatToReturn=='plot') {
+    require(scales)
+    gg <- ggplot(sensitivityForPlot, aes(x=SubjectID, y=MedianChange)) +
+      theme_publish1() +
+      theme(axis.text.y = element_text(size=8)) +
+      xlab('Subject') + ylab('Decline in visual sensitivity (%)') +
+      geom_hline(yintercept=0, linetype='dashed', color='grey60', size=0.1) +
+      coord_cartesian() +
+      scale_y_continuous(labels=percent, breaks=pretty_breaks(n=10)) +
+      coord_flip() +
+      geom_blank() +
+      stat_summary(data=sensitivity, aes(x=SubjectID, y=Change, group=SubjectID),
+                   fun.data=median_cl_boot, conf=0.95, geom='errorbar', width=0.0, color = 'grey80') +
+      geom_point(size=2, color='grey20')
+    return(gg)
+  }
+  else {
+    return(sensitivityForPlot)
+  }
 }
 
 

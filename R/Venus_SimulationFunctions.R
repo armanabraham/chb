@@ -71,7 +71,7 @@ SimulateSubjectResponses <- function(subjectWeights,           # Weights of the 
                                      conditionsToSimulate,      # Experimental conditions that will be used for simulation
                                      lapseRate=0)              # Lapse rate between 0 and 1. If 0, not used. Otherwise, the response will be randomly generated with that probability
 {
-  if (failWeightsToSim==NA | successWeightsToSim==NA) {
+  if (is.na(failWeightsToSim) | is.na(successWeightsToSim)) {
     failWeightsToSim <- NA
     successWeightsToSim <- NA
   }
@@ -105,9 +105,11 @@ SimulateSubjectResponses <- function(subjectWeights,           # Weights of the 
       historyWeights <- expand.grid(failWeight=failWeightsToSim, successWeight=successWeightsToSim, IsSubject=FALSE)
       sbjFailWeight <- with(subjectModel, Weight[Parameter=='PrevFail1'])
       sbjSuccessWeight <- with(subjectModel, Weight[Parameter=='PrevCorr1'])
-
+      # Make matrix of history weights that will be used for the simulation
       historyWeights <- rbind(historyWeights,
                               data.frame(failWeight=sbjFailWeight, successWeight=sbjSuccessWeight, IsSubject=TRUE))
+      # Removes entries that have NA, particularly when failWeightsToSim and successWeightsToSim are NA. It only leaves subject weights for simulation. 
+      historyWeights <- historyWeights[complete.cases(historyWeights),]  # love this function
       for (ixWeight in 1:nrow(historyWeights)) {
         newModel <- subjectModel
         newModel$Weight[newModel$Parameter=="PrevFail1"] <- historyWeights$failWeight[ixWeight]

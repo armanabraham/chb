@@ -166,14 +166,16 @@ CV.glmnet <- function(formula, data, subset, na.action, ...) {
 	#browser()
 }
 
-# ###########################################
-# ## Returns root means square error
+
+#' Return root means square error
 # rmse <- function(y, h) {
 	# return(sqrt(mean((y - h)^2)))
 # }
 
-###########################################
-## Returns negative log likelihood of choosing right
+
+#' Log-likelihood of choosing right
+#'
+#' It is negative log-likelihood
 Likelihood <- function(y,     # Participant responses
                        pRight)  # Probability of responding right
 {
@@ -419,10 +421,12 @@ FitRegulirizedLogisticRegression <- function (glmData, 			        # subject resp
 #'
 #' One which produces smallest log likelihood.
 #' Then, compute glm coefficients on full dataset using the best lambda
+#'
 #' @export
 ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with different lambda values
-                                          lambdas, 		    # Lambda values used in regularized
-                                          glmData,        # subject responses
+                                          lambdas, 		    # Lambda values used in regularized regression
+                                          glmData,        # trial by trial subject responses
+                                          lapseRate,      #
                                           nBack) 			    # n history back
 {
   performanceSummary <- ddply(performance, .(SubjectID, SessionID, Lambda), summarise, MedianLhood=median(Likelihood))
@@ -878,12 +882,12 @@ ProbitThreshold <- function(p,        # probability
   return(th)
 }
 
-# CONTINUE FROM HERE
-####################################################################################
-## DON"T USE THIS. The most accurate threshold estimation is for probit.
-## Compute threshold and slope of psychometric function which was fitted with a
-## Weilbull. takes in a glm object and probability at which to estimate the threshold
-## Adapted from "Modelling Psychophysical Data in R", p. 155
+#' Estimate threshold and slope using Weibull
+#'
+#' DON"T USE THIS. The most accurate threshold estimation is probit.
+#' Compute threshold and slope of psychometric function which was fitted with a
+#' Weilbull. takes in a glm object and probability at which to estimate the threshold
+#' Adapted from "Modelling Psychophysical Data in R", p. 155
 WeibullThAndSlope <- function(p,        # probability at which to compute the contrast
                               model)		  # glm object
 {  # This was added to GLM model to aid log transform of negative contrast values
