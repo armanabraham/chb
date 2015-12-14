@@ -340,16 +340,17 @@ PrepareRawData <- function(rawData 		# Input data frame
   return(rawData)
 }
 
-
-#' Fit model parameters
+#' Fit model parameters using regularized regression
 #'
 #' Uses regulirized logistic regression (glmnet)
+#' TODO: describe fully how training and validation done to find the best lambda
 #' @export
-FitRegulirizedLogisticRegression <- function (glmData, 			        # subject responses
-                                              lambdas, 			        #
-                                              alpha=0,			        # When alpha is 0, run "ridge" regularization. When alpha is set to 1, run "lasso" regularization
-                                              B,                    # number of simulation to estimate lambda that provides lowest log-likelihood
-                                              fitHistoryBias=TRUE) 	# Include history parameters. When FALSE, only contrast and general bias parameters are computed
+RegularizedRegression <- function (glmData, 			          # subject responses
+                                   fitWithLapseRate=FALSE,  # If TRUE, probabilities are adjusted (made smaller) using lapse rate
+                                   lambdas, 			          #
+                                   alpha=0,			            # When alpha is 0, run "ridge" regularization. When alpha is set to 1, run "lasso" regularization
+                                   B,                       # number of simulation to estimate lambda that provides lowest log-likelihood
+                                   fitHistoryBias=TRUE) 	  # Include history parameters. When FALSE, only contrast and general bias parameters are computed
 {
   maximumSessions <- max(as.numeric(levels(glmData$SessionID)))
   nParticipants <- length(levels(glmData$SubjectID))
@@ -372,6 +373,13 @@ FitRegulirizedLogisticRegression <- function (glmData, 			        # subject resp
       oneSessionData <- subset(oneSubjectData, oneSubjectData$SessionID == ixSession)
       ifelse(!is.null(oneSessionData$Condition), numCondition <- unique(oneSessionData$Condition), numCondition <- -1)
 
+      # Adjustment for lapse rate, if necessary
+      if (fitWithLapseRate) {
+        lapseRate <- ThSlopeAndLapse(oneSessionData)$LapseRate
+      } else {
+        lapseRate <- 0
+      }
+
       n <- nrow(oneSessionData)
       for (ixSimulation in 1:B) {
         indices <- sort(sample(1:n, round(0.8 * n)))
@@ -381,27 +389,24 @@ FitRegulirizedLogisticRegression <- function (glmData, 			        # subject resp
         contrasts <- levels(as.factor(oneSessionData$Contrast))
         contrasts <- paste("c", contrasts, sep = "")
         ## Find out number of prev success and failure parameters
-        nHistoryBack <- length(grep(successColName, colnames(glmData)))
+        nHistoryBack <- length(grep(chb:::successColName, colnames(glmData)))
         if (nHistoryBack > 0 & fitHistoryBias) {
-          histColumnNames <- paste(c(successColName, failColName), sort(rep(seq(1:nHistoryBack), 2)), sep="")
+          histColumnNames <- paste(c(chb:::successColName, chb:::failColName), sort(rep(seq(1:nHistoryBack), 2)), sep="")
           coefs <- paste(c(histColumnNames, contrasts), sep = "")
         } else {
           coefs <- contrasts
         }
 
         formulaLogistic <- as.formula(paste("as.factor(y) ~", paste(coefs, collapse = "+")))
-        #glmnetCurrentFit <- Glmnet(formula=formulaLogistic, family='binomial', data=training.data, alpha=0)
-        #browser()
         glmnetCurrentFit <- Glmnet(formula=formulaLogistic, family='binomial', data=training.data, lambda=lambdas, alpha=alpha)
-        #lambdas <- glmnetCurrentFit$lambda
-        #glmnetFits[[subjectNumber, as.numeric(ixSession)]] <- glmnetCurrentFit
 
         ## Prepare X predictor values to run on test dataset
+        #browser()
         newx <- cbind(`(Intercept)` = rep(1, nrow(test.data)), data.matrix(test.data[, coefs]))
         likelihoods <- sapply(lambdas, function(lambda) {
           pRight <- predict(glmnetCurrentFit, newx, s = lambda, type = "response")
           responses <- test.data$y
-          return(Likelihood(responses, pRight))
+          return(Likelihood(responses, pRight, lapseRate))
         })
         #browser()
         nLambdas <- length(lambdas)
@@ -410,6 +415,7 @@ FitRegulirizedLogisticRegression <- function (glmData, 			        # subject resp
                                                      Condition=rep(numCondition, nLambdas),
                                                      SimulationID=rep(ixSimulation, nLambdas),
                                                      Lambda = lambdas,
+                                                     LapseRate = rep(lapseRate, nLambdas),
                                                      Likelihood = likelihoods))
       }
     }
@@ -417,28 +423,34 @@ FitRegulirizedLogisticRegression <- function (glmData, 			        # subject resp
   return(performance)
 }
 
-#' Find the best lambda
+
+#' Find best weights
 #'
-#' One which produces smallest log likelihood.
+#' Chooses best weights out of all weights generated for each lambda
+#' of regularized regression.
 #' Then, compute glm coefficients on full dataset using the best lambda
 #'
+#' @param performance all results from regularized regression after running RegularizedRegression
+#' @param lambdas list of lambda parameters that was used to run RegularizedRegression
+#' @param glmData trial-by-trial subject responses
+#' @param nBack number of trials to go back in history. Default is 1.
+#'
 #' @export
-ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with different lambda values
-                                          lambdas, 		    # Lambda values used in regularized regression
-                                          glmData,        # trial by trial subject responses
-                                          lapseRate,      #
-                                          nBack) 			    # n history back
+BestWeightsByLambda <- function (performance, 		# GLM weights with different lambda values
+                                 lambdas, 		    # Lambda values used in regularized regression
+                                 alpha=0,         # Regularization type
+                                 glmData,         # trial by trial subject responses
+                                 nBack) 			    # n history back
 {
-  performanceSummary <- ddply(performance, .(SubjectID, SessionID, Lambda), summarise, MedianLhood=median(Likelihood))
-  bestLambdas <- ddply(performanceSummary, .(SubjectID, SessionID), summarise, Lambda=Lambda[which.min(MedianLhood)], MinLhood=min(MedianLhood))
-  allWeights <- data.frame(ixSubject =  character(), ixSession = character(), Condition=as.numeric(), Lambda=double(),
-                           Regularized=character(), Parameter = character(), Weight = double(),
-                           Vif=double(), AIC=double(), AICc=double(), logLhood=double(), df=double())
-  #weightsByLambda <- data.frame(ixSubject =  character(), ixSession = character, Condition=as.numeric(), Lambda=double(), Parameter = character(), Weight = double())
-  # glmnetFits is a two-dimensional list to store computed GLMs for each subject and each session
+  performanceSummary <- ddply(performance, .(SubjectID, SessionID, Lambda), summarise, MedianLhood=median(Likelihood), LapseRate=mean(LapseRate))
+  bestLambdas <- ddply(performanceSummary, .(SubjectID, SessionID), summarise, Lambda=Lambda[which.min(MedianLhood)], MinLhood=min(MedianLhood), LapseRate=mean(LapseRate))
+  print(bestLambdas)
+
+  allWeights <- data.frame() # For storing final results
   maximumSessions <- max(as.numeric(levels(glmData$SessionID)))
   nParticipants <- length(levels(glmData$SubjectID))
   glmnetFits <- array(list(), c(nParticipants, maximumSessions))
+
   for (ixSubject in levels(droplevels(glmData$SubjectID))) {
     oneSubjectData <- subset(glmData, glmData$SubjectID == ixSubject)
     subjectNumber <- which(ixSubject == levels(droplevels(glmData$SubjectID)))
@@ -449,12 +461,12 @@ ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with diff
       contrasts <- paste("c", contrasts, sep = "")
       ## Find out number of prev success and failure parameters
       if (missing(nBack)) {
-        nHistoryBack <- length(grep(successColName, colnames(glmData)))
+        nHistoryBack <- length(grep(chb:::successColName, colnames(glmData)))
       } else {
         nHistoryBack <- nBack
       }
       if (nHistoryBack > 0) {
-        histColumnNames <- paste(c(successColName, failColName), sort(rep(seq(1:nHistoryBack), 2)), sep="")
+        histColumnNames <- paste(c(chb:::successColName, chb:::failColName), sort(rep(seq(1:nHistoryBack), 2)), sep="")
         coefs <- paste(c(histColumnNames, contrasts), sep = "")
       } else {
         coefs <- contrasts
@@ -464,6 +476,7 @@ ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with diff
       ## Fit the model
       glmnetFit <- Glmnet(formula=formulaLogistic, family='binomial', data = oneSessionData, lambda=lambdas, alpha=alpha)
       bestLambda <- with(bestLambdas, bestLambdas[(SubjectID==ixSubject & SessionID==ixSession), ])$Lambda
+      lapseRate <- with(bestLambdas, bestLambdas[(SubjectID==ixSubject & SessionID==ixSession), ])$LapseRate
       # Get likelihood computed with best lambda
       glmnetBestWeights <- coef(glmnetFit, s=bestLambda)
       ## Let's store glmnet values for later use
@@ -476,7 +489,8 @@ ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with diff
       newx <- cbind(`(Intercept)` = rep(1, nrow(oneSessionData)), data.matrix(oneSessionData[, coefs]))
       pRight <- predict(glmnetFit, newx, s = bestLambda, type='response')
       responses <- oneSessionData$y
-      logLhoodBestLambda <- Likelihood(responses, pRight)
+      #browser()
+      logLhoodBestLambda <- Likelihood(responses, pRight, lapseRate)
       aicReg <- logLhoodBestLambda + 2*nWeights # AIC computed for the regularized regression
       # AICc
       aiccReg <- aicReg + ((2*nWeights*(nWeights+1)) / (nrow(oneSessionData) - nWeights - 1))
@@ -490,6 +504,7 @@ ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with diff
                                                  Regularized=rep("yes", nWeights),
                                                  Parameter=rownames(data.frame(glmnetBestWeights)),
                                                  Weight=as.numeric(glmnetBestWeights),
+                                                 LapseRate=rep(lapseRate, nWeights),
                                                  Vif=NA,
                                                  AIC=aicReg,
                                                  AICc=aiccReg,
@@ -513,6 +528,7 @@ ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with diff
                          Regularized=rep("no", nWeights),
                          Parameter=rownames(data.frame(glmWeights)),
                          Weight=as.numeric(glmWeights),
+                         LapseRate=rep(lapseRate, nWeights),
                          AIC=aicUnreg,
                          AICc=aiccUnreg,
                          logLhood=logLikUnreg,
@@ -527,14 +543,17 @@ ComputeWeightsWithBestLambda <- function (performance, 		# GLM weights with diff
 }
 
 
+
+
+
 #' Model weight for each lambda
 #'
 #' Function that computes weights for all lambda regularization
 #' parameters
 #' @export
-GetWeightsWithAllLambdas <- function(performance,
-                                     lambdas, 		# Lambda values used in regularized
-                                     glmData) 			# subject responses
+WeightsWithAllLambdas <- function(performance,
+                                  lambdas, 		# Lambda values used in regularized
+                                  glmData) 			# subject responses
 {
 
   # bestLambdas <- ddply(performanceSummary, .(SubjectID, SessionID), summarise, Lambda=Lambda[which.min(MedianLhood)], MinLhood=min(MedianLhood))
