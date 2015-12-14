@@ -1726,4 +1726,23 @@ LapseRateFromHighestContrast <- function(rightwardResponses) # proportion rightw
 }
 
 
+#' Sort parameters of the model in intuitive way
+#'
+#' Model parameter names can get scrambled and when plotting them
+#' it can be difficult to understand the graph. This function
+#' convniently groups model parameters by name such that contrast
+#' intensities are followed by bias weights.
+#'
+#' @param paramNames model parameter names as factor (see usage)
+#'
+#' @examples
+#' modelWeights$Parameters <- sortParams(modelWeights$Parameters)
+SortParams <- function(paramNames) {
+  ## Sort contrast and history weights in the order that will make it intuitive to read the plot
+  paramNamesSorted <- levels(paramNames)
+  contrastNames <- sort(paramNamesSorted[grep("c0",paramNamesSorted)])
+  biasNames <- paramNamesSorted[!paramNamesSorted %in% contrastNames]
+  paramNamesSorted <- unique(c(biasNames, contrastNames))
+  return(paramNamesSorted)
+}
 

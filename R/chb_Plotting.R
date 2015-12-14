@@ -147,10 +147,10 @@ PlotContrastAndHistoryWeights <- function(regularizedWeights,
                                se=std/sqrt(n))
 
   ## Sort contrast and history weights in the order that will make it intuitive to read the plot
-  paramNames <- levels(idealSbjParams$Parameter)
-  contrastNames <- sort(paramNames[grep("c0",paramNames)])
-  biasNames <- paramNames[!paramNames %in% contrastNames]
-  idealSbjParams$Parameter <- factor(idealSbjParams$Parameter, levels=unique(c(biasNames, contrastNames)))
+#   paramNames <- levels(idealSbjParams$Parameter)
+#   contrastNames <- sort(paramNames[grep("c0",paramNames)])
+#   biasNames <- paramNames[!paramNames %in% contrastNames]
+  idealSbjParams$Parameter <- factor(idealSbjParams$Parameter, levels=SortParams(idealSbjParams$Parameter))
 
   ## Add grouping parameter that will be used to plot different weights in different colors
   idealSbjParams$plotColor <-"Contrast"
