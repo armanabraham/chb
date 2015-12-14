@@ -340,6 +340,7 @@ PrepareRawData <- function(rawData 		# Input data frame
   return(rawData)
 }
 
+
 #' Fit model parameters using regularized regression
 #'
 #' Uses regulirized logistic regression (glmnet)
