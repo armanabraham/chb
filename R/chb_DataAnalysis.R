@@ -175,12 +175,26 @@ CV.glmnet <- function(formula, data, subset, na.action, ...) {
 
 #' Log-likelihood of choosing right
 #'
-#' It is negative log-likelihood
-Likelihood <- function(y,     # Participant responses
-                       pRight)  # Probability of responding right
+#' For minimization and by convention, log-likelihood is returned multiplied by -2
+#'
+#' @param y participant choices
+#' @param pRight probability of choosing right
+#' @param lapseRate lapse rate
+#'
+#' @return -2*logLikelihood
+Likelihood <- function(y, pRight, lapseRate=0)
 {
-  -2*sum(log(ifelse(y==1, pRight, 1 - pRight)))
+  #' I think the adjustment here should multiply all p by
+  #' z'(t) = lapseRate + z(t)(1-2*lapseRate)
+  #' where z(t) = p_right if subject choice=right
+  #' or 1-p_right if subject choice is left
+  #browser()
+  z <- ifelse(y==1, pRight, 1-pRight)
+  zPrime <- lapseRate + (1-2*lapseRate)*z
+  return(-2*sum(log(zPrime)))
+  # -2*sum(log(ifelse(y==1, pRight, 1 - pRight)))
 }
+
 
 #' Prepare data for GLM analysis
 #'
