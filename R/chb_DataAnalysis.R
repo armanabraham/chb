@@ -52,22 +52,6 @@ SubjectDemographics <- function(getAge=TRUE,
              20, 19, 27, 27)
     demographics <- cbind(demographics, Age=age)
   }
-  # Subject degrees
-  # s001 - Arman Abrahamyan					PhD
-  # s002 - Georgios Keliris					PhD
-  # s003 - Andrew Meso						PhD
-  # s004 - Mackenzie Dolginow				Undergrad
-  # s005 - Kenji Haruhana					Undergrad
-  # s006 - Ilias Rentzeperis				PhD
-  # s007 - Steeve Laquitaine				PhD
-  # s008 - Katharina Dobs					Grad
-  # s009 - Tancy Kao					PhD
-  # s010 - Li Feng Yi					Grad
-  # s011 - Erin Munro					PhD
-  # s012 - Yuka Okazaki					PhD
-  # s013 - Siva Kaveri					Grad
-  # s014 - Darren Seibert (Summer School student)		Grad
-  # s015 - Stephen Bruggemann (Summer School student)	Undergrad
   if (getEducation) {
     demographics <- cbind(demographics, Education=rep(NA, length(subjectID)))
     phds <- c("s001", "s002", "s003", "s006", "s007", "s008",
@@ -1771,6 +1755,8 @@ LapseRateFromHighestContrast <- function(rightwardResponses) # proportion rightw
 #'
 #' @examples
 #' modelWeights$Parameters <- sortParams(modelWeights$Parameters)
+#'
+#' @export
 SortParams <- function(paramNames) {
   ## Sort contrast and history weights in the order that will make it intuitive to read the plot
   paramNamesSorted <- levels(paramNames)
