@@ -374,7 +374,7 @@ RegularizedRegression <- function (glmData, 			          # subject responses
 
       # Adjustment for lapse rate, if necessary
       if (fitWithLapseRate) {
-        lapseRate <- ThSlopeAndLapse(oneSessionData)$LapseRate
+        lapseRate <- ThSlopeAndLapse(oneSessionData, returnMeans = FALSE, whichConditions = numCondition)$LapseRate
       } else {
         lapseRate <- 0
       }
@@ -1666,7 +1666,7 @@ ggplot(data=thAndBiases, aes(x=MeanRT, y=th75)) +
 #'
 #' @param inputData data structured as glmData
 #' @param returnMeans if TRUE, computes average for each subject. Otherwise, returns by-run results
-#' @param whichConditions conditions to analyse. For natural bias, always include conditions 1 and 13
+#' @param whichConditions conditions to analyse. For natural bias, include conditions 1 and 13
 #'
 #' @return data frame containing threshold, slope and lapse rate of each subject. If requested, can return by-run results, otherwise means of each subject
 #'
@@ -1676,11 +1676,11 @@ ggplot(data=thAndBiases, aes(x=MeanRT, y=th75)) +
 #' @export
 ThSlopeAndLapse <- function(inputData,                  # Data of type glmData
                             returnMeans=TRUE,           # When FALSE, returns per-run data, otherwise, averages across runs per subject
-                            whichConditions=c(1,13))    # condition or conditions to process
+                            whichConditions)            # condition or conditions to process
 {
   # Select only bias weights
   ## Plot proportion correct of responding right to stimuli presented either to left or to right
-  pcRight <- droplevels(subset(inputData, Condition %in% whichConditions))
+  if (!missing(whichConditions)) pcRight <- droplevels(subset(inputData, Condition %in% whichConditions))
   #pcRight <- droplevels(subset(inputData, Condition %in% conditionsToPlot))
   ## Label left responses to right gratings with negative contrast. Right responses to right gratings will remain with positive sign
   pcRight[pcRight$VisualField == 1,]$Contrast <- pcRight[pcRight$VisualField == 1,]$Contrast * -1
