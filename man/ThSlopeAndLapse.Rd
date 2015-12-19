@@ -4,14 +4,14 @@
 \alias{ThSlopeAndLapse}
 \title{Get threshold, slope and lapse rate from glmData}
 \usage{
-ThSlopeAndLapse(inputData, returnMeans = TRUE, whichConditions = c(1, 13))
+ThSlopeAndLapse(inputData, returnMeans = TRUE, whichConditions)
 }
 \arguments{
 \item{inputData}{data structured as glmData}
 
 \item{returnMeans}{if TRUE, computes average for each subject. Otherwise, returns by-run results}
 
-\item{whichConditions}{conditions to analyse. For natural bias, always include conditions 1 and 13}
+\item{whichConditions}{conditions to analyse. For natural bias, include conditions 1 and 13}
 }
 \value{
 data frame containing threshold, slope and lapse rate of each subject. If requested, can return by-run results, otherwise means of each subject

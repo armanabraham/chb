@@ -1304,77 +1304,77 @@ PlotWeightChangeByRun <- function (weightsRegularized		# Bias weights
 ##########################################################
 ##
 PlotBiasesAndTheirDiffs <- function(weights, 						## Weight to be plotted. Need to be from same condition and only one type, such as fail or success
-									weightToPlot = 'PrevFail1',		# Name of the weigh to be plotted
-									conditionsToPlot = c(1,2),		# Pair of conditions to be plotted
-									sorted=T,						# Subjects will be sorted by the weight of first condition
-									#subjectsToPlot = 'all', 		# Default is to plot all subjects
-									geomPointColor='black',			# Color of geom_point
-									figureWidth=7.095745, 			# Width of the plot
-									figureHeight= 3.989362			# Height of the plot
-									) {
+                                    weightToPlot = 'PrevFail1',		# Name of the weigh to be plotted
+                                    conditionsToPlot = c(1,2),		# Pair of conditions to be plotted
+                                    sorted=T,						# Subjects will be sorted by the weight of first condition
+                                    #subjectsToPlot = 'all', 		# Default is to plot all subjects
+                                    geomPointColor='black',			# Color of geom_point
+                                    figureWidth=7.095745, 			# Width of the plot
+                                    figureHeight= 3.989362			# Height of the plot
+) {
 
-	dataToPlot <- droplevels(subset(weights, (Condition %in% conditionsToPlot) & (Parameter %in% weightToPlot)))
-	## Remove two unnecessary columns (Vif and Regularized)
-	dataToPlot$Vif <- NULL
-	dataToPlot$Regularized <- NULL
-	## Get subject labels for both conditions
-	sbjInFirstCondition <- levels(droplevels(dataToPlot[dataToPlot$Condition==conditionsToPlot[1],]$SubjectID))
-	sbjInSecondCondition <- levels(droplevels(dataToPlot[dataToPlot$Condition==conditionsToPlot[2],]$SubjectID))
-	## Find common subjects for both conditions. Only they will be plotted
-	subjectsToPlot <- intersect(sbjInFirstCondition, sbjInSecondCondition)
-	## Select those subjects for further data processing and plotting
-	dataToPlot <- droplevels(subset(dataToPlot, SubjectID %in% subjectsToPlot))
+  dataToPlot <- droplevels(subset(weights, (Condition %in% conditionsToPlot) & (Parameter %in% weightToPlot)))
+  ## Remove two unnecessary columns (Vif and Regularized)
+  dataToPlot$Vif <- NULL
+  dataToPlot$Regularized <- NULL
+  ## Get subject labels for both conditions
+  sbjInFirstCondition <- levels(droplevels(dataToPlot[dataToPlot$Condition==conditionsToPlot[1],]$SubjectID))
+  sbjInSecondCondition <- levels(droplevels(dataToPlot[dataToPlot$Condition==conditionsToPlot[2],]$SubjectID))
+  ## Find common subjects for both conditions. Only they will be plotted
+  subjectsToPlot <- intersect(sbjInFirstCondition, sbjInSecondCondition)
+  ## Select those subjects for further data processing and plotting
+  dataToPlot <- droplevels(subset(dataToPlot, SubjectID %in% subjectsToPlot))
 
-	## Show failure rate for each condition (success rate is 100%-failRate)
-	failRateFirstCondition <- ComputeFailRate(glmData, conditionsToPlot[1], subjectsToPlot)
-	print(paste("Failure rate for first condition: ", sprintf("%.0f", failRateFirstCondition*100), "%", sep=""))
-	failRateSecondCondition <- ComputeFailRate(glmData, conditionsToPlot[2], subjectsToPlot)
-	print(paste("Failure rate for second condition: ", sprintf("%.0f", failRateSecondCondition*100), "%", sep=""))
+  ## Show failure rate for each condition (success rate is 100%-failRate)
+  failRateFirstCondition <- ComputeFailRate(glmData, conditionsToPlot[1], subjectsToPlot)
+  print(paste("Failure rate for first condition: ", sprintf("%.0f", failRateFirstCondition*100), "%", sep=""))
+  failRateSecondCondition <- ComputeFailRate(glmData, conditionsToPlot[2], subjectsToPlot)
+  print(paste("Failure rate for second condition: ", sprintf("%.0f", failRateSecondCondition*100), "%", sep=""))
 
-	## Compute mean weights
-	meanDataToPlot <- ddply(dataToPlot, .(SubjectID, Parameter, Condition), summarise, MeanWeight=mean(Weight))
-	## Compute difference by subtracting weights from first condition from second condition
-	weightsDifference <- ddply(meanDataToPlot, .(SubjectID, Parameter), summarise, Difference=diff(MeanWeight))
-	## Rename last column name to have the same name as meanDataToPlot data frame. This is to join them later.
-	names(weightsDifference)[3] <- "MeanWeight"
-	## Add condition column and assign it 1000 which will indicate that it is the data containing difference of conditions
-	weightsDifference$Condition <- 1000
-	## Bind mean weights of two conditions and their differences into one data frame for plotting
-	meanDataToPlot <- rbind(meanDataToPlot, weightsDifference)
+  ## Compute mean weights
+  meanDataToPlot <- ddply(dataToPlot, .(SubjectID, Parameter, Condition), summarise, MeanWeight=mean(Weight))
+  ## Compute difference by subtracting weights from first condition from second condition
+  weightsDifference <- ddply(meanDataToPlot, .(SubjectID, Parameter), summarise, Difference=diff(MeanWeight))
+  ## Rename last column name to have the same name as meanDataToPlot data frame. This is to join them later.
+  names(weightsDifference)[3] <- "MeanWeight"
+  ## Add condition column and assign it 1000 which will indicate that it is the data containing difference of conditions
+  weightsDifference$Condition <- 1000
+  ## Bind mean weights of two conditions and their differences into one data frame for plotting
+  meanDataToPlot <- rbind(meanDataToPlot, weightsDifference)
 
-	## If requested, sort subjects by first condition weights
-	if (sorted) {
-		## Sort SubjectID so that subjects with lowest weight are plotted first and
-		## subjects with largest weight are plotted the last. Sorting is done based on
-		## on first condition passed to the function
-		firstConditionData <- subset(meanDataToPlot, Condition== conditionsToPlot[1])
-		weightsOrder <- order(-firstConditionData$MeanWeight)
-		subjectsOrdered <- firstConditionData$SubjectID[weightsOrder]
-		## Change order of subjects in the data that will be plotted.
-		meanDataToPlot$SubjectID <- factor(meanDataToPlot$SubjectID, levels=subjectsOrdered)
-	}
-#2
-	p <- ggplot(meanDataToPlot, aes(x=SubjectID, y=MeanWeight))
-	p <- p + theme_few() +
-		theme(strip.background=element_rect(colour="white", fill="white")) +
-		theme(panel.background=element_rect(colour="white")) +
-		theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank()) +
-		theme(axis.ticks.x=element_blank(), axis.ticks.y=element_blank()) +
-		scale_y_continuous(limits=c(-2.5, 2.5)) +
-		geom_hline(yintercept=0.0, size=0.5, colour="#a9a9a9", linetype = "solid") +
-		geom_segment(aes(xend=SubjectID), yend=0, colour=geomPointColor, size=1) +
-	  	#geom_errorbar(aes(ymin=MeanWeight-se, ymax=MeanWeight+se), width=0.01, alpha=0.2) +
-	  	#geom_point(size=1.5, )
-	  	geom_point(size=5, color=geomPointColor) +
-	  	geom_point(size=2.7, color='white') +
-	  	xlab("")  +
-	  	ylab("") +
-		theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3),axis.line.y = element_blank()) +
-	  	coord_flip() +
-	  	facet_grid(~Condition, labeller=ConditionLabels)
+  ## If requested, sort subjects by first condition weights
+  if (sorted) {
+    ## Sort SubjectID so that subjects with lowest weight are plotted first and
+    ## subjects with largest weight are plotted the last. Sorting is done based on
+    ## on first condition passed to the function
+    firstConditionData <- subset(meanDataToPlot, Condition== conditionsToPlot[1])
+    weightsOrder <- order(-firstConditionData$MeanWeight)
+    subjectsOrdered <- firstConditionData$SubjectID[weightsOrder]
+    ## Change order of subjects in the data that will be plotted.
+    meanDataToPlot$SubjectID <- factor(meanDataToPlot$SubjectID, levels=subjectsOrdered)
+  }
+  #2
+  p <- ggplot(meanDataToPlot, aes(x=SubjectID, y=MeanWeight))
+  p <- p + theme_few() +
+    theme(strip.background=element_rect(colour="white", fill="white")) +
+    theme(panel.background=element_rect(colour="white")) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank()) +
+    theme(axis.ticks.x=element_blank(), axis.ticks.y=element_blank()) +
+    scale_y_continuous(limits=c(-2.5, 2.5)) +
+    geom_hline(yintercept=0.0, size=0.5, colour="#a9a9a9", linetype = "solid") +
+    geom_segment(aes(xend=SubjectID), yend=0, colour=geomPointColor, size=1) +
+    #geom_errorbar(aes(ymin=MeanWeight-se, ymax=MeanWeight+se), width=0.01, alpha=0.2) +
+    #geom_point(size=1.5, )
+    geom_point(size=5, color=geomPointColor) +
+    geom_point(size=2.7, color='white') +
+    xlab("")  +
+    ylab("") +
+    theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3),axis.line.y = element_blank()) +
+    coord_flip() +
+    facet_grid(~Condition, labeller=ConditionLabels)
 
-	dev.new(width=figureWidth, height=figureHeight)
-	print(p)
+  dev.new(width=figureWidth, height=figureHeight)
+  print(p)
 
 }
 
@@ -1455,16 +1455,16 @@ PlotSuccessFailOnEachSide <- function(inputData,   	 	# Input data in the format
 ################################## ComputeFailRate #########################################
 ## Compute failure rate.
 ComputeFailRate <- function(inputData, 	# trail by trial data
-							condition,  # One condition for which stats will be computed
-							subjects	# Subject for whom stats will be computed
-							) {
+                            condition,  # One condition for which stats will be computed
+                            subjects)	# Subject for whom stats will be computed
+{
 
-	selectData <- subset(inputData, Condition %in% condition)
-	selectData <- subset(selectData, SubjectID %in% subjects)
-	selectData <- droplevels(selectData)
-	res <- table(selectData$CorrIncorr) / nrow(selectData)
-	failRate <- res[1]
-	return(failRate)
+  selectData <- subset(inputData, Condition %in% condition)
+  selectData <- subset(selectData, SubjectID %in% subjects)
+  selectData <- droplevels(selectData)
+  res <- table(selectData$CorrIncorr) / nrow(selectData)
+  failRate <- res[1]
+  return(failRate)
 }
 
 
@@ -1553,11 +1553,23 @@ PlotSlopeVsBias <- function(inputData,          # Data of type slopeSimData
 }
 
 
-################################## PlotSlopeVsBias #########################################
-# Plot threshold vs subject bias to see if the magnitude of the bias
-# depends on subject sensitivity. Subjects with higher visual sensitivity might
-# have smaller biases because they have to rely less on priors and more on sensory evidence
-PlotThVsBias <- function(inputData,          # Data of type glmData
+#' Plot contrast threshold vs subject bias
+#'
+#' Shows if contrast threshold correlates with with history weights.
+#' For example, subjects with higher visual sensitivity might
+#' have smaller biases because they have to rely less on priors and more on sensory evidence
+#'
+#' TODO: Function also plots relationship between biases and RT. Need to incorporate this as a switch in parameters (e.g., whatToPlot=c('th', 'rt'))
+#'
+#' @param inputData trial-by-trial data of glmData type
+#' @param modelWeights regularized model weights of subjects that were computed on `inputData`
+#' @param conditionsToPlot conditions to plot. Default is `1`
+#'
+#' @examples
+#' PlotThVsBias(glmData, regWeights, conditionsToPlot=c(1,13))
+#'
+#' @export
+PlotThVsBias <- function(inputData,
                          modelWeights,       # Weights that will be plotted. Default all weights will be plotted. Subjects will always be plotted.
                          conditionsToPlot=1)   # Which conditions to be plotted
 {
