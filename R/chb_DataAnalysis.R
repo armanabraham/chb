@@ -30,12 +30,20 @@ prevSuccessColor <- '#2b83ba'
 # Set of regularization parameters (lambdas) to test
 lambdas <- c(exp(-8), exp(-7), exp(-6), exp(-5), exp(-4), exp(-3), 0.05, 0.1, 0.15, 0.25, 0.3, 0.5, 0.8, 1, 3, 7, 11, 15, 20)
 
-#' Subject demographics such as age and education
+#' Subject info
+#'
+#' Returns age, gender, education and lab location of subjects
+#'
+#' @param getAge if TRUE, returns subjects' age
+#' @param getGender if TRUE, returns subjects' gender
+#' @param getEducation if TRUE, returns subjects' education (PhD vs No-Phd)
+#' @param getLab if TRUE, returns lab location of subjects (Stanford, UCL or RIKEN)
 #'
 #' @export
 SubjectDemographics <- function(getAge=TRUE,
                                 getGender=TRUE,
-                                getEducation=TRUE)
+                                getEducation=TRUE,
+                                getLab=TRUE)
 {
   subjectID <- c("s001", "s002", "s003", "s004", "s005", "s006", "s007", "s008",
                  "s009", "s010", "s011", "s012", "s013", "s014", "s015", "s016",
@@ -76,6 +84,16 @@ SubjectDemographics <- function(getAge=TRUE,
     demographics$Gender[demographics$SubjectID %in% females] <- "F"
     males <- c("s001", "s002", "s003", "s005", "s006", "s007", "s010", "s013", "s014", "s015", "s031", "s032", "s034", "s040")
     demographics$Gender[demographics$SubjectID %in% males] <- "M"
+  }
+
+  if (getLab) {
+    demographics <- cbind(demographics, Lab=rep(NA, length(subjectID)))
+    rikenSbj <- c('s001', 's002', 's003', 's004', 's005', 's006', 's007', 's008', 's009', 's010', 's011', 's012', 's013', 's014', 's015')
+    stanfordSbj <- c('s030', 's031', 's032', 's033', 's034', 's035', 's036', 's037', 's038', 's039', 's040', 's041')
+    uclSbj <- c('s016', 's017', 's018', 's019', 's020', 's021', 's022', 's023', 's024', 's025', 's026', 's027')
+    demographics$Lab[demographics$SubjectID %in% rikenSbj] <- 'RIKEN'
+    demographics$Lab[demographics$SubjectID %in% stanfordSbj] <- 'Stanford'
+    demographics$Lab[demographics$SubjectID %in% uclSbj] <- 'UCL'
   }
 
   return(demographics)
