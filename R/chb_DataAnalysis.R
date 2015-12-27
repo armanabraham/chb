@@ -982,12 +982,12 @@ PredictvalsWeibull <- function(model, xvar, yvar, xrange=NULL, samples=100, ...)
 ####################################################################################
 ## Compute and display run and subject statistics
 DataStatistics <- function(weights,  				# Regularized weights
-							figureWidth=5.68, 		# Width of the plot
-							figureHeight=15.51, 	# Height of the plot
-							plotByCondition=TRUE,	# Plot by Condition. Otherwise, collapse across Condition
-							plotSubjectMeans		# Compute means across Sessions for each subject and plots those means
-									   ) {
-# TODO
+                           figureWidth=5.68, 		# Width of the plot
+                           figureHeight=15.51, 	# Height of the plot
+                           plotByCondition=TRUE,	# Plot by Condition. Otherwise, collapse across Condition
+                           plotSubjectMeans		# Compute means across Sessions for each subject and plots those means
+) {
+  # TODO
 
 
 }
