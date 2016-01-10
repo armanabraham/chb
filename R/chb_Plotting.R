@@ -157,7 +157,9 @@ PlotContrastAndHistoryWeights <- function(regularizedWeights,
   idealSbjParams$plotColor[idealSbjParams$Parameter=="(Intercept)"] <- "Intercept"
   idealSbjParams$plotColor[grep(successColName, idealSbjParams$Parameter)] <- "PrevSuccess"
   idealSbjParams$plotColor[grep(failColName, idealSbjParams$Parameter)] <- "PrevFail"
-  colorValues <- c("#a4a4a4",prevSuccessColor, prevFailColor, "#6f6f6f")
+  #colorValues <- c("#a4a4a4",prevSuccessColor, prevFailColor, "#6f6f6f")
+  colorValues <- c("#3A79B6","#3A79B6", "#3A79B6", "#3A79B6")
+
   names(colorValues) <- c("Intercept", "PrevSuccess", "PrevFail", "Contrast")
   idealSbjParams$plotOrder <- 4
   idealSbjParams$plotOrder[idealSbjParams$Parameter=="(Intercept)"] <- 1
@@ -166,20 +168,16 @@ PlotContrastAndHistoryWeights <- function(regularizedWeights,
 
   p <- ggplot(idealSbjParams, aes(x=Parameter, y=MeanWeight)) +
     theme_publish1() +
-    #geom_rangeframe(color="grey30") +
-    #     theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank()) +
-    #     theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3)) +
-    #     theme(axis.ticks.x = element_line(colour = "#a9a9a9", size = 0.3), axis.ticks.y = element_line(colour = "#a9a9a9", size = 0.3)) +
     theme(legend.position = legendPos) +
     geom_hline(yintercept = 0, size = 0.3, colour = "grey70", linetype = "dashed") +
-    stat_summary(aes(group=Parameter), fun.data = "mean_cl_boot", B=1000, conf.int = 0.68, geom = "errorbar", size = 0.5, width = 0.0, color="grey80") +
+    stat_summary(aes(group=Parameter), fun.data = "mean_cl_boot", B=1000, conf.int = 0.68, geom = "errorbar", size = 0.5, width = 0.0, color="#3A79B6") +
     geom_blank() +
-    geom_line(subset = .(plotColor == "Contrast"), aes(group=1), stat="summary", fun.y="mean", color="grey70", size=1) +
+    geom_line(subset = .(plotColor == "Contrast"), aes(group=1), stat="summary", fun.y="mean", color='#3A79B6', size=1) +
     geom_point(aes(group=Parameter), size=7, color="white", stat="summary", fun.y="mean") +
     geom_point(aes(group=Parameter, color=plotColor), size=4, stat="summary", fun.y="mean") +
     scale_colour_manual(values=colorValues) +
-    coord_cartesian(ylim = c(-1.2, 5)) +
-    scale_y_continuous(breaks=seq(-1, 5, 1))
+    coord_cartesian(ylim = c(-1.2, 5.5)) +
+    scale_y_continuous(breaks=seq(-1, 5.5, 1))
 
   if (showAxisLabels) {
     p <- p + theme(axis.text.x=element_text(angle = 90, vjust=0.5))
@@ -593,4 +591,231 @@ PlotSensitivityDecline <- function(simThAndSlope,
   }
 }
 
+
+######################################################################################################
+## Plot psychometric curves separated into preceding choice being left or right
+## Blue color on the plot means preceding choice was right (that is, subject stayed on the same side,
+## cause we are plotting proportion right responses)
+## Red color means that preceding choice was left (subject switched)
+PlotByPrecedingChoice <- function(inputData, 				      # This data should have glmData structure
+                                  geomPointSize=3.5,		  # Size of geom_point
+                                  showMidPoints=T, 		    # Shows vertical and horizontal lines at mid points on x and y axes
+                                  confIntData,            # Simulated data in glmData format that will be used to show confidence intervals
+                                  figureWidth=21.37078, 	# Width of the plot
+                                  figureHeight=9.034483,  # Height of the plot
+                                  plotFigure=TRUE) 	        # Plot figure or just return ggplot object otherwise
+{
+  # Function to mark trials by previous choice (L or R)
+  # Adds new column called PrecedingChoice which is 1 when
+  # preceding choice was L or 2 when R
+  MarkTrialsByChoice <- function(dat) {
+    markedTrials <- data.frame()	# Trials marked as preceded by L or R choice will be placed here
+    for (ixSubject in levels(droplevels(dat$SubjectID))) {
+      oneSubjectData <- droplevels(subset(dat, dat$SubjectID == ixSubject))
+      #subjectNumber <- which(ixSubject == levels(droplevels(glmData$SubjectID)))
+      #for (ixCondition in unique(oneSubjectData$Condition)) {
+      for (ixSession in levels(droplevels(oneSubjectData$SessionID))) {
+        oneSessionData <- subset(oneSubjectData, (oneSubjectData$SessionID==ixSession))
+        ## Find trials that were preceded by Left choice
+        ixLeftResponse <- which(oneSessionData$Response==1)
+        ## If last trial was included, exclude it cause we cannot add 1 more trial to the session
+        #browser()
+        if (ixLeftResponse[length(ixLeftResponse)] == nrow(oneSessionData)) ixLeftResponse <- ixLeftResponse[-length(ixLeftResponse)]
+        trialsPrecededByLChoice <- oneSessionData[ixLeftResponse+1, ]
+        ## Find trials that were preceded by Right choice
+        ixRightResponse <- which(oneSessionData$Response==2)
+        if (ixRightResponse[length(ixRightResponse)] == nrow(oneSessionData)) ixRightResponse <- ixRightResponse[-length(ixRightResponse)]
+        trialsPrecededByRChoice <- oneSessionData[ixRightResponse+1, ]
+        trialsPrecededByLChoice$PrecedingChoice <- 1
+        trialsPrecededByRChoice$PrecedingChoice <- 2
+        rbind(trialsPrecededByLChoice, trialsPrecededByRChoice)
+        ## Bind together trials marked by L and R preceding choices
+        markedTrials <- rbind(markedTrials, trialsPrecededByLChoice, trialsPrecededByRChoice)
+      }
+      #}
+    }
+    markedTrials$PrecedingChoice <- as.factor(markedTrials$PrecedingChoice)
+    return(markedTrials)
+  }
+
+
+  PercentRightChoices <- function(markedTrials)
+  {
+    ## Plot proportion correct of responding right to stimuli presented either to left or to right
+    pcRight <- droplevels(markedTrials)
+    ## Label left responses to right gratings with negative contrast. Right responses to right gratings will remain with positive sign
+    pcRight[pcRight$VisualField == 1,]$Contrast <- pcRight[pcRight$VisualField == 1,]$Contrast * -1
+    ## Summary of responses to gratings presented in the right
+    pcRightSummary <- ddply(pcRight, .(SubjectID, SessionID, Condition, PrecedingChoice, VisualField, Contrast), summarise,
+                            nRightResp = sum(Response == 2),
+                            nLeftResp = sum(Response == 1),
+                            nRStim = sum(VisualField == 2),
+                            nLStim = sum(VisualField == 1))
+    pcRightSummary <- ddply(pcRightSummary, .(SubjectID, SessionID, Condition, PrecedingChoice, VisualField, Contrast), summarise,
+                            pRightCorrect = nRightResp / (nRStim + nLStim),
+                            nYesR=nRightResp,
+                            nNoR=nLeftResp)
+    ## Convert contrast into %
+    pcRightSummary$Contrast <- pcRightSummary$Contrast * 100
+    return(pcRightSummary)
+
+  }
+
+  # Mark trials preceded by L and R choices from the data
+  markedTrials <- MarkTrialsByChoice(inputData)
+  markedTrialsPrcRChoice <- PercentRightChoices(markedTrials)
+
+  # Mark trials preceded by L/R choices using simulated data to estimate confidence intervals
+  if (!missing(confIntData)) {
+    confIntMarkedTrials <- MarkTrialsByChoice(confIntData)
+    # Compute proportion right choices using simulated data to estimate confidence intervals
+    confIntPrcRChoice <- PercentRightChoices(confIntMarkedTrials)
+    # Compute confidence intervals
+    confInt <- ddply(confIntPrcRChoice, .
+                     (SubjectID, Condition, PrecedingChoice, Contrast),
+                     function(x) {c(quantile(x$pRightCorrect, c(0.16, 0.84), names=FALSE), # 68% confidence intervals.
+                                    median(x$pRightCorrect),
+                                    mean(x$pRightCorrect),
+                                    mean(x$pRightCorrect)-sqrt(var(x$pRightCorrect)/length(x$pRightCorrect)),
+                                    mean(x$pRightCorrect)+sqrt(var(x$pRightCorrect)/length(x$pRightCorrect)),
+                                    mean_cl_boot(x$pRightCorrect, conf.int=0.95)$ymin,
+                                    mean_cl_boot(x$pRightCorrect, conf.int=0.95)$ymax)
+                     })
+    colnames(confInt)[which(names(confInt) %in% c("V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8"))] <- c("ciMin", "ciMax", "Median", "Mean", "seMin", "seMax", "ciBMin", "ciBMax")
+    # This is a dummy variable needed for ggplot to be present, but ggplot will
+    # only use ciMin and ciMax to plot the error bars
+    confInt$pRightCorrect <- 0.5
+  }
+
+  g <- ggplot(data = markedTrialsPrcRChoice, aes(x = Contrast, y = pRightCorrect, color=PrecedingChoice))
+  #g <- g + geom_line(aes(group=PrecedingChoice), stat="summary", fun.y="mean", size=0.3)
+  g <- g + theme_publish2() + geom_rangeframe(color="grey30")
+  if (showMidPoints) {
+    g <- g + geom_vline(xintercept = 0.0, size = 0.2, colour = "grey30", linetype = "dashed")
+    g <- g + geom_hline(yintercept = 0.5, size = 0.2, colour = "grey30", linetype = "dashed")
+  }
+  #g <- g + geom_errorbar(data=confInt, aes(ymin=ciMin, ymax=ciMax), width=0.1, alpha=0.3)
+  if (!missing(confIntData)) g <- g + geom_smooth(data=confInt, aes(ymin=ciMin, ymax=ciMax, fill=PrecedingChoice), stat="identity", linetype=0, alpha=0.2)
+  #g <- g + geom_smooth(data=confInt, aes(ymin=ciBMin, ymax=ciBMax, fill=PrecedingChoice), stat="identity", linetype=0, alpha=0.2)
+  g <- g + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank())
+  #g <- g + theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3))
+  g <- g + theme(axis.ticks.x = element_line(colour = "#a9a9a9", size = 0.3))
+  g <- g + stat_summary(aes(group=PrecedingChoice), fun.data = "mean_cl_boot", B=500, conf.int = 0.68, geom = "errorbar", size = 0.2, width = 0.0)
+  if (!missing(confIntData)) g <- g + geom_line(data=confInt, aes(x=Contrast, y=Mean), alpha=0.5, size=0.2)
+  #g <- g + geom_line(data=confInt, aes(x=Contrast, y=Median), alpha=0.4)
+  g <- g + geom_point(aes(group=PrecedingChoice), stat="summary", fun.y="mean", size=geomPointSize)
+  g <- g + facet_wrap(~SubjectID, scale="free_x")
+  g <- g + scale_colour_manual(values=c(prevFailColor, prevSuccessColor))
+  g <- g + ylab("Proportion rightward choices")
+  g <- g + xlab("Contrast (%)")
+  g <- g + theme(legend.position="none")
+
+  if (plotFigure) {
+    dev.new(width=figureWidth, height=figureHeight)
+    g
+  } else {
+    return(g)
+  }
+}
+
+
+######################################################################################################
+## Plot how biases change as a function of run. Do subjects change their biases particularly during
+## bias induction conditions?
+PlotWeightChangeByRun <- function (weightsRegularized		# Bias weights
+) {
+  #weights <- droplevels(subset(weightsRegularized, Parameter!="(Intercept)"))
+  weights <- droplevels(subset(weightsRegularized, Parameter %in% c("PrevCorr1", "PrevFail1")))
+  ggplot(data= weights, aes(x=SessionID, y=Weight, color=Parameter)) +
+    theme_few() +
+    geom_path(aes(group=Parameter), stat="smooth", method="lm", color="#102d95", size=1.5, alpha=1.0, lineend="round") +
+    geom_line(aes(group=Parameter)) +
+    #geom_point(size=3, color="white", fill="white", shape=21) +
+    geom_point() +
+    #scale_colour_manual(values=c(prevSuccessColor, prevFailColor), labels=c("Prev success", "Prev failure"))  +
+    xlab("Run") +
+    ylab("Bias") +
+    #coord_cartesian(ylim=c(-3.2, 3.2)) +
+    #theme(axis.text.x = element_text(angle=-45)) +
+    facet_grid(Condition~SubjectID, labeller=ConditionLabels, scales="free")
+  #facet_grid(SubjectID~Condition, labeller=ConditionLabels, scales="free") +
+  #guides(color=FALSE)
+}
+
+##########################################################
+##
+PlotBiasesAndTheirDiffs <- function(weights, 						## Weight to be plotted. Need to be from same condition and only one type, such as fail or success
+                                    weightToPlot = 'PrevFail1',		# Name of the weigh to be plotted
+                                    conditionsToPlot = c(1,2),		# Pair of conditions to be plotted
+                                    sorted=T,						# Subjects will be sorted by the weight of first condition
+                                    #subjectsToPlot = 'all', 		# Default is to plot all subjects
+                                    geomPointColor='black',			# Color of geom_point
+                                    figureWidth=7.095745, 			# Width of the plot
+                                    figureHeight= 3.989362			# Height of the plot
+) {
+
+  dataToPlot <- droplevels(subset(weights, (Condition %in% conditionsToPlot) & (Parameter %in% weightToPlot)))
+  ## Remove two unnecessary columns (Vif and Regularized)
+  dataToPlot$Vif <- NULL
+  dataToPlot$Regularized <- NULL
+  ## Get subject labels for both conditions
+  sbjInFirstCondition <- levels(droplevels(dataToPlot[dataToPlot$Condition==conditionsToPlot[1],]$SubjectID))
+  sbjInSecondCondition <- levels(droplevels(dataToPlot[dataToPlot$Condition==conditionsToPlot[2],]$SubjectID))
+  ## Find common subjects for both conditions. Only they will be plotted
+  subjectsToPlot <- intersect(sbjInFirstCondition, sbjInSecondCondition)
+  ## Select those subjects for further data processing and plotting
+  dataToPlot <- droplevels(subset(dataToPlot, SubjectID %in% subjectsToPlot))
+
+  ## Show failure rate for each condition (success rate is 100%-failRate)
+  failRateFirstCondition <- ComputeFailRate(glmData, conditionsToPlot[1], subjectsToPlot)
+  print(paste("Failure rate for first condition: ", sprintf("%.0f", failRateFirstCondition*100), "%", sep=""))
+  failRateSecondCondition <- ComputeFailRate(glmData, conditionsToPlot[2], subjectsToPlot)
+  print(paste("Failure rate for second condition: ", sprintf("%.0f", failRateSecondCondition*100), "%", sep=""))
+
+  ## Compute mean weights
+  meanDataToPlot <- ddply(dataToPlot, .(SubjectID, Parameter, Condition), summarise, MeanWeight=mean(Weight))
+  ## Compute difference by subtracting weights from first condition from second condition
+  weightsDifference <- ddply(meanDataToPlot, .(SubjectID, Parameter), summarise, Difference=diff(MeanWeight))
+  ## Rename last column name to have the same name as meanDataToPlot data frame. This is to join them later.
+  names(weightsDifference)[3] <- "MeanWeight"
+  ## Add condition column and assign it 1000 which will indicate that it is the data containing difference of conditions
+  weightsDifference$Condition <- 1000
+  ## Bind mean weights of two conditions and their differences into one data frame for plotting
+  meanDataToPlot <- rbind(meanDataToPlot, weightsDifference)
+
+  ## If requested, sort subjects by first condition weights
+  if (sorted) {
+    ## Sort SubjectID so that subjects with lowest weight are plotted first and
+    ## subjects with largest weight are plotted the last. Sorting is done based on
+    ## on first condition passed to the function
+    firstConditionData <- subset(meanDataToPlot, Condition== conditionsToPlot[1])
+    weightsOrder <- order(-firstConditionData$MeanWeight)
+    subjectsOrdered <- firstConditionData$SubjectID[weightsOrder]
+    ## Change order of subjects in the data that will be plotted.
+    meanDataToPlot$SubjectID <- factor(meanDataToPlot$SubjectID, levels=subjectsOrdered)
+  }
+  #2
+  p <- ggplot(meanDataToPlot, aes(x=SubjectID, y=MeanWeight))
+  p <- p + theme_few() +
+    theme(strip.background=element_rect(colour="white", fill="white")) +
+    theme(panel.background=element_rect(colour="white")) +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank()) +
+    theme(axis.ticks.x=element_blank(), axis.ticks.y=element_blank()) +
+    scale_y_continuous(limits=c(-2.5, 2.5)) +
+    geom_hline(yintercept=0.0, size=0.5, colour="#a9a9a9", linetype = "solid") +
+    geom_segment(aes(xend=SubjectID), yend=0, colour=geomPointColor, size=1) +
+    #geom_errorbar(aes(ymin=MeanWeight-se, ymax=MeanWeight+se), width=0.01, alpha=0.2) +
+    #geom_point(size=1.5, )
+    geom_point(size=5, color=geomPointColor) +
+    geom_point(size=2.7, color='white') +
+    xlab("")  +
+    ylab("") +
+    theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3),axis.line.y = element_blank()) +
+    coord_flip() +
+    facet_grid(~Condition, labeller=ConditionLabels)
+
+  dev.new(width=figureWidth, height=figureHeight)
+  print(p)
+
+}
 
