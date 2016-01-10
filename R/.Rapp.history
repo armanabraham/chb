@@ -27,7 +27,6 @@ persp3d(x=bivn.kde, col = col1)#
 with(bivn.kde2, surface3d(x,y,z, color = col2))
 help(package='rgl')
 persp3d(x=bivn.kde, col = col1)
-persp3d(x=bivn.kde, col = col1)
 bivn.kde
 ?persp3d
 persp3d(x = seq(0, 1, len = nrow(z)), y = seq(0, 1, len = ncol(z)), z,#
