@@ -12,7 +12,8 @@ PlotSensitivityDecline(simThAndSlope, whatToPlot = "slope",
 
 \item{whatToPlot}{either decline of slope or threshold can be plotted}
 
-\item{whatToReturn}{return either 'plot' as ggplot object or 'data' prepared for plotting, which can be used for other operations}
+\item{whatToReturn}{return either 'plot' as ggplot object or 'data' prepared for plotting, which can be used for other operations, or 'stats'. 'stats'
+parameter shows p value of one-sampled test of median change (whether sensitivity decline is significantly different from 0)}
 }
 \description{
 Displays decline in visual sensitivity as a result of choice history biases.

@@ -4,7 +4,12 @@
 \alias{ThAndSlopeForSimData}
 \title{Compute threshold and slope from simulated trials}
 \usage{
-ThAndSlopeForSimData(simTrials)
+ThAndSlopeForSimData(simTrials, fitWithLapseRate = TRUE)
+}
+\arguments{
+\item{simTrials}{simulated trials, which can be done using the function SimulateSubjectResponses}
+
+\item{fitWithLapseRate}{if TRUE, the probit psychometric function will be fitted using the lapse rate}
 }
 \description{
 There is another function called ThAndSlope which works

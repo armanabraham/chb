@@ -5,7 +5,7 @@
 \title{Estimate slope and threshold with and without history biases}
 \usage{
 SimulateNoBiasVsSubjectBias(sbjWeights, nTrialsPerContrast = 100, B = 30,
-  setLRBiasToZero = TRUE)
+  setLRBiasToZero = TRUE, probitWithLapseRate = TRUE)
 }
 \arguments{
 \item{sbjWeights}{regularized subject weights}
