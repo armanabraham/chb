@@ -533,7 +533,8 @@ HistoryAdaptationScatterplot <- function(weights,  				# Regularized weights
 #'
 #' @param simThAndSlope simulated threshold and slope computed using function NoBiasVsSubjectBias (see example below).
 #' @param whatToPlot either decline of slope or threshold can be plotted
-#' @param whatToReturn return either 'plot' as ggplot object or 'data' prepared for plotting, which can be used for other operations
+#' @param whatToReturn return either 'plot' as ggplot object or 'data' prepared for plotting, which can be used for other operations, or 'stats'. 'stats'
+#' parameter shows p value of one-sampled test of median change (whether sensitivity decline is significantly different from 0) 
 #'
 #' @examples
 #' load('20150919_allWeights_RIKEN_UCL_Stanford_cond1n13.RData',verbose=TRUE)
@@ -544,7 +545,7 @@ HistoryAdaptationScatterplot <- function(weights,  				# Regularized weights
 #' @export
 PlotSensitivityDecline <- function(simThAndSlope,
                                    whatToPlot='slope', # can be either 'slope' or 'threshold'
-                                   whatToReturn='plot')
+                                   whatToReturn='plot') # can be plot, data or stats
 {
   if (whatToPlot == 'slope') colName <- 'slope' else colName <- 'th75'
   # Make subject's (biased) and unbiased sensitivity column into two separate columns
@@ -586,9 +587,22 @@ PlotSensitivityDecline <- function(simThAndSlope,
       geom_point(size=2, color='grey20')
     return(gg)
   }
-  else {
+  
+  if (whatToReturn=='data') {
     return(sensitivityForPlot)
   }
+  
+  if (whatToReturn=='stats') {
+    stat <- function(dat) {
+      # Wilcoxon one-sample median test
+      wilcoxonTest <- wilcox.test(dat$Change)
+      #browser()
+      data.frame(SubjectID=unique(dat$SubjectID), pVal=wilcoxonTest$p.value)
+    }
+    statDat <- ddply(sensitivity, .(SubjectID), .fun=stat)
+    return(statDat)
+  }
+
 }
 
 
