@@ -21,7 +21,8 @@
 SimulateNoBiasVsSubjectBias <- function(sbjWeights,               # Regularized weights
                                        nTrialsPerContrast = 100,  # Number of trials per contrast
                                        B = 30,                    # Number of simulations
-                                       setLRBiasToZero=TRUE)      # Sets L/R bias to zero for all simulations, including for subject weights
+                                       setLRBiasToZero=TRUE,      # Sets L/R bias to zero for all simulations, including for subject weights
+                                       probitWithLapseRate=TRUE)
 {
   # Set L/R bias (intercept) to 0, if requested
   if (setLRBiasToZero) sbjWeights[sbjWeights$Parameter=='(Intercept)',]$Weight  <- 0
@@ -41,7 +42,7 @@ SimulateNoBiasVsSubjectBias <- function(sbjWeights,               # Regularized 
                                                     nTrialsPerContrast=nTrialsPerContrast, # Number of trials per contrast
                                                     setLRBiasToZero=setLRBiasToZero)
         # Compute 75% thresholds for biased and unbiased simulations
-        oneSimThAndSlope <- ThAndSlopeForSimData(simTrialsNoBias)
+        oneSimThAndSlope <- ThAndSlopeForSimData(simTrialsNoBias, fitWithLapseRate=probitWithLapseRate)
         thsAndSlopes <- rbind(thsAndSlopes, data.frame(oneSimThAndSlope,
                                                        SimulationID=rep(ixSim, nrow(oneSimThAndSlope))))
       }
@@ -108,7 +109,7 @@ SimulateSubjectResponses <- function(subjectWeights,           # Weights of the 
       # Make matrix of history weights that will be used for the simulation
       historyWeights <- rbind(historyWeights,
                               data.frame(failWeight=sbjFailWeight, successWeight=sbjSuccessWeight, IsSubject=TRUE))
-      # Removes entries that have NA, particularly when failWeightsToSim and successWeightsToSim are NA. It only leaves subject weights for simulation. 
+      # Removes entries that have NA, particularly when failWeightsToSim and successWeightsToSim are NA. It only leaves subject weights for simulation.
       historyWeights <- historyWeights[complete.cases(historyWeights),]  # love this function
       for (ixWeight in 1:nrow(historyWeights)) {
         newModel <- subjectModel
@@ -228,28 +229,20 @@ SimulateOneSubject<- function(subjectWeights,           # This should include In
 #' with subjects' data rather than simulated data, because simulated
 #' data of glmData type includes additional column called IsSubject
 #'
+#' @param simTrials simulated trials, which can be done using the function SimulateSubjectResponses
+#' @param fitWithLapseRate if TRUE, the probit psychometric function will be fitted using the lapse rate
+#'
 #' @export
-ThAndSlopeForSimData <- function(simTrials) {
-  pcRight <- simTrials
-  ## Label left responses to right gratings with negative contrast. Right responses to right gratings will remain with positive sign
-  pcRight[pcRight$VisualField == 1,]$Contrast <- pcRight[pcRight$VisualField == 1,]$Contrast * -1
-  ## Summary of responses to gratings presented in the right
-  pcRightSummary <- ddply(pcRight, .(SubjectID, SessionID, VisualField, Contrast, IsSubject, FailWeight, SuccessWeight), summarise,
-                          nRightResp = sum(Response == 2),
-                          nLeftResp = sum(Response == 1),
-                          nRStim = sum(VisualField == 2),
-                          nLStim = sum(VisualField == 1))
-  pcRightSummary <- ddply(pcRightSummary, .(SubjectID, SessionID, VisualField, Contrast, IsSubject, FailWeight, SuccessWeight), summarise,
-                          pRightCorrect = nRightResp / (nRStim + nLStim),
-                          nYesR=nRightResp,
-                          nNoR=nLeftResp)
+ThAndSlopeForSimData <- function(simTrials,
+                                 fitWithLapseRate=TRUE) {
+
+  pcRightSummary <- ProportionRightwardResponses(simTrials)
   ## Convert contrast into %
   pcRightSummary$Contrast <- pcRightSummary$Contrast * 100
-
-  models <- dlply(pcRightSummary, c("SubjectID", "IsSubject", "FailWeight", "SuccessWeight"), .fun=chb:::FitProbit)
+  # Fit psychometric curves
+  models <- dlply(pcRightSummary, c("SubjectID", "IsSubject", "FailWeight", "SuccessWeight"), .fun=chb:::FitProbit, fitWithLapseRate=fitWithLapseRate)
   predvals <- ldply(models, .fun=chb:::PredictvalsProbit, xvar="Contrast", yvar="pRightCorrect", type="response")
-  #browser()
-  ## Further summarise results cause we need slopes only
+  ## Further summarise results cause we need slopes and thresholds only
   predvals1 <- ddply(predvals, .(SubjectID, IsSubject, FailWeight, SuccessWeight), summarise, slope=mean(slope), th50=mean(Th50), th75=mean(Th75))
   ## Get percent change of slope relative to slope when error weight is 0
   #predvals1 <- ddply(predvals1, .(SubjectID), transform, SlopeChange = slope[which(PrevFailWeight==0)] / slope)
