@@ -12,6 +12,8 @@ PlotThVsBias(inputData, modelWeights, fitWithLapseRate = TRUE,
 
 \item{modelWeights}{regularized model weights of subjects that were computed on `inputData`}
 
+\item{fitWithLapseRate}{if TRUE, fits psychometric curves by considering the lapse rate}
+
 \item{conditionsToPlot}{conditions to plot. Default is `1`}
 }
 \description{

@@ -7,7 +7,7 @@
 ThAndSlopeForSimData(simTrials, fitWithLapseRate = TRUE)
 }
 \arguments{
-\item{simTrials}{simulated trials, which can be done using the function SimulateSubjectResponses}
+\item{simTrials}{simulated trials, which can be done using the function SimulateSubjectResponses. Requires single run simulation. For simulating a run multiple times, do and call this function multiple times.}
 
 \item{fitWithLapseRate}{if TRUE, the probit psychometric function will be fitted using the lapse rate}
 }
