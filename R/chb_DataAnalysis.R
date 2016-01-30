@@ -1414,7 +1414,7 @@ PlotSlopeVsBias <- function(inputData,          # Data of type slopeSimData
 #' @param inputData trial-by-trial data of glmData type
 #' @param modelWeights regularized model weights of subjects that were computed on `inputData`
 #' @param conditionsToPlot conditions to plot. Default is `1`
-#' @params fitWithLapseRate if TRUE, fits psychometric curves by considering the lapse rate
+#' @param fitWithLapseRate if TRUE, fits psychometric curves by considering the lapse rate
 #'
 #' @examples
 #' PlotThVsBias(glmData, regWeights, conditionsToPlot=c(1,13))
