@@ -229,14 +229,33 @@ SimulateOneSubject<- function(subjectWeights,           # This should include In
 #' with subjects' data rather than simulated data, because simulated
 #' data of glmData type includes additional column called IsSubject
 #'
-#' @param simTrials simulated trials, which can be done using the function SimulateSubjectResponses
+#' @param simTrials simulated trials, which can be done using the function SimulateSubjectResponses. Requires single run simulation. For simulating a run multiple times, do and call this function multiple times.
 #' @param fitWithLapseRate if TRUE, the probit psychometric function will be fitted using the lapse rate
 #'
 #' @export
 ThAndSlopeForSimData <- function(simTrials,
                                  fitWithLapseRate=TRUE) {
 
-  pcRightSummary <- ProportionRightwardResponses(simTrials)
+  ## Don't use ProportionRightwardResponses in the fragment below
+  ## because IsSubject is not processed by that function
+  pcRight <- simTrials
+  ## Label left responses to right gratings with negative contrast. Right responses to right gratings will remain with positive sign
+  pcRight[pcRight$VisualField == 1,]$Contrast <- pcRight[pcRight$VisualField == 1,]$Contrast * -1
+  ## Summary of responses to gratings presented in the right
+  pcRightSummary <- ddply(pcRight, .(SubjectID, SessionID, VisualField, Contrast, IsSubject, FailWeight, SuccessWeight), summarise,
+                          nRightResp = sum(Response == 2),
+                          nLeftResp = sum(Response == 1),
+                          nRStim = sum(VisualField == 2),
+                          nLStim = sum(VisualField == 1))
+
+  pcRightSummary <- ddply(pcRightSummary, .(SubjectID, SessionID, VisualField, Contrast, IsSubject, FailWeight, SuccessWeight), summarise,
+                          pRightCorrect = nRightResp / (nRStim + nLStim),
+                          nYesR=nRightResp,
+                          nNoR=nLeftResp)
+  # Get lapse rate
+  lapses <- ddply(pcRightSummary, .(SubjectID, SessionID, IsSubject, FailWeight, SuccessWeight), .fun=LapseRateFromHighestContrast)
+  pcRightSummary <- merge(pcRightSummary, lapses)
+
   ## Convert contrast into %
   pcRightSummary$Contrast <- pcRightSummary$Contrast * 100
   # Fit psychometric curves
