@@ -44,7 +44,7 @@ PlotPsychometricCurves <- function(inputData,
   #browser()
   g <- ggplot(data = pcRightSummary, aes(x = Contrast, y = pRightCorrect))
   g <- g + theme_few()
-  g <- g + geom_vline(yintercept = 0.0, size = 0.2, colour = "grey30", linetype = "dashed")
+  g <- g + geom_vline(xintercept = 0.0, size = 0.2, colour = "grey30", linetype = "dashed")
   g <- g + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.border=element_blank())
   g <- g + theme(axis.line = element_line(colour = "#a9a9a9", size = 0.3))
   g <- g + theme(axis.ticks.x = element_line(colour = "#a9a9a9", size = 0.3))
@@ -242,7 +242,7 @@ HistoryWeightsScatterplot <- function(weights,  				# Regularized weights
   }
 
   p <- p + geom_hline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "solid") +
-    geom_vline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "solid") +
+    geom_vline(xintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "solid") +
     coord_cartesian(xlim = xlims, ylim = ylims) +
     xlab("Weight success (Bs)") + ylab("Weight failure (Bf)") +
     theme_publish1()
@@ -316,7 +316,7 @@ HistoryScatterplotByEducation <- function(weights,    			# Regularized weights
   }
   p <- ggplot(data = biases, aes(x=PrevCorr1, y=PrevFail1))
   p <- p + geom_hline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed") +
-    geom_vline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed")
+    geom_vline(xintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed")
   ## If only means for each subject are plotted, draw error bars first
   if (plotSubjectMeans) {
     #     if (!plotMeansByEducation)  {
@@ -469,7 +469,7 @@ HistoryAdaptationScatterplot <- function(weights,  				# Regularized weights
 
   p <- ggplot(data = biases, aes(x=PrevCorr1, y=PrevFail1))
   p <- p + geom_hline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed") +
-    geom_vline(yintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed")
+    geom_vline(xintercept = 0.0, size = 0.3, colour = plottingColor, linetype = "dashed")
   ## If only means for each subject are plotted, draw error bars first
   if (plotSubjectMeans) {
     if (plotErrorBars) {
@@ -489,7 +489,7 @@ HistoryAdaptationScatterplot <- function(weights,  				# Regularized weights
     #p <- p + geom_point(aes(color=Education, shape=as.factor(Condition)), size=5, alpha=0.8)
     p <- p + geom_point(aes(color=Education, shape=as.factor(Condition)), size=5)
     p <- p + geom_path(aes(group=SubjectID), arrow = arrow(length = unit(0.2,"cm"), type="closed"), colour="grey50")
-    p <- p + geom_point(subset=.(Condition==sourceTargetOrder[1]), size=4.1, color="white")
+    #p <- p + geom_point(subset=.(Condition==sourceTargetOrder[1]), size=4.1, color="white")
     ## Show average change by computing means of failure and success weights for each condition
     p <- p + geom_path(data=overallMeans, aes(group=1, x= MeanPrevCorr, y= MeanPrevFail), arrow = arrow(length = unit(0.5,"cm"), type="closed"), size=7, alpha=0.3)
     #p <- p + geom_point(aes(fill=Education, shape=as.factor(Condition)), size=3.5)
@@ -534,7 +534,7 @@ HistoryAdaptationScatterplot <- function(weights,  				# Regularized weights
 #' @param simThAndSlope simulated threshold and slope computed using function NoBiasVsSubjectBias (see example below).
 #' @param whatToPlot either decline of slope or threshold can be plotted
 #' @param whatToReturn return either 'plot' as ggplot object or 'data' prepared for plotting, which can be used for other operations, or 'stats'. 'stats'
-#' parameter shows p value of one-sampled test of median change (whether sensitivity decline is significantly different from 0) 
+#' parameter shows p value of one-sampled test of median change (whether sensitivity decline is significantly different from 0)
 #'
 #' @examples
 #' load('20150919_allWeights_RIKEN_UCL_Stanford_cond1n13.RData',verbose=TRUE)
@@ -583,15 +583,15 @@ PlotSensitivityDecline <- function(simThAndSlope,
       coord_flip() +
       geom_blank() +
       stat_summary(data=sensitivity, aes(x=SubjectID, y=Change, group=SubjectID),
-                   fun.data=median_cl_boot, conf=0.95, geom='errorbar', width=0.0, color = 'grey80') +
+                   fun.data="median_cl_boot", geom='errorbar', width=0.0, color = 'grey80') +
       geom_point(size=2, color='grey20')
     return(gg)
   }
-  
+
   if (whatToReturn=='data') {
     return(sensitivityForPlot)
   }
-  
+
   if (whatToReturn=='stats') {
     stat <- function(dat) {
       # Wilcoxon one-sample median test
