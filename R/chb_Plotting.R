@@ -170,9 +170,9 @@ PlotContrastAndHistoryWeights <- function(regularizedWeights,
     theme_publish1() +
     theme(legend.position = legendPos) +
     geom_hline(yintercept = 0, size = 0.3, colour = "grey70", linetype = "dashed") +
-    stat_summary(aes(group=Parameter), fun.data = "mean_cl_boot", B=1000, conf.int = 0.68, geom = "errorbar", size = 0.5, width = 0.0, color="#3A79B6") +
+    stat_summary(aes(group=Parameter), fun.data = "mean_cl_boot", fun.args=list(conf.int=0.68, B=1000), geom = "errorbar", size = 0.5, width = 0.0, color="#3A79B6") +
     geom_blank() +
-    geom_line(subset = .(plotColor == "Contrast"), aes(group=1), stat="summary", fun.y="mean", color='#3A79B6', size=1) +
+    geom_line(data=subset(idealSbjParams, plotColor="Contrast"), aes(group=1), stat="summary", fun.y="mean", color='#3A79B6', size=1) +
     geom_point(aes(group=Parameter), size=7, color="white", stat="summary", fun.y="mean") +
     geom_point(aes(group=Parameter, color=plotColor), size=4, stat="summary", fun.y="mean") +
     scale_colour_manual(values=colorValues) +
