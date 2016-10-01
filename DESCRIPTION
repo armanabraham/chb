@@ -3,8 +3,8 @@ Version: 0.1
 Date: 3/07/2015
 Title: Choice history biases
 Description: Analyze, model and simulate choice history biases
-Author: Arman Abrahamyan <armana@stanford.edu>
-Maintainer: Arman Abrahamyan <armana@stanford.edu>
+Author: Arman Abrahamyan <a.abrahamyan@gmail.com>
+Maintainer: Arman Abrahamyan <a.abrahamyan@gmail.com>
 License: GPL
 Imports:
     aapack,
